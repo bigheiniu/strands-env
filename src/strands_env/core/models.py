@@ -45,7 +45,9 @@ from typing import Any
 import boto3
 import botocore.config
 import httpx
-from strands.models import BedrockModel, Model, OpenAIModel
+from strands.models import Model
+from strands.models.bedrock import BedrockModel
+from strands.models.openai import OpenAIModel
 from strands_sglang import SGLangClient, SGLangModel
 from transformers import PreTrainedTokenizerBase
 
