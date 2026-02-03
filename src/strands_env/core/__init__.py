@@ -12,23 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Core types and base classes for strands-env."""
-
-from .action import Action, TaskContext
-from .environment import Environment, StepResult, TerminationReason
-from .model import ClientParams, ModelConfig, SamplingParams
-from .observation import Observation, TokenObservation
-from .reward import RewardFunction, RewardResult
+from .environment import Environment
+from .models import ModelFactory
+from .types import (
+    Action,
+    Observation,
+    RewardFunction,
+    RewardResult,
+    StepResult,
+    TaskContext,
+    TerminationReason,
+    TokenObservation,
+)
 
 __all__ = [
     "Action",
-    "ClientParams",
     "Environment",
-    "ModelConfig",
+    "ModelFactory",
     "Observation",
     "RewardFunction",
     "RewardResult",
-    "SamplingParams",
     "StepResult",
     "TaskContext",
     "TerminationReason",

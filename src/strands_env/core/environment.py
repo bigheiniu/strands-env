@@ -12,81 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Base Environment class for strands-env.
-
-This module defines the Environment base class that implements the template method
-pattern for agent-environment interaction.
-"""
+"""Base Environment class for `strands-env`."""
 
 from __future__ import annotations
 
 import logging
-from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 
-from pydantic import BaseModel
 from strands import Agent
 from strands.handlers.callback_handler import PrintingCallbackHandler
 from strands.telemetry.metrics import EventLoopMetrics
 from strands.types.content import Messages
-from strands.types.exceptions import EventLoopException, MaxTokensReachedException
-from strands_sglang import MaxToolIterationsReachedError, TokenManager, ToolIterationLimiter
+from strands_sglang import TokenManager, ToolIterationLimiter
 
-from .action import Action
-from .model import ModelConfig
-from .observation import Observation, TokenObservation
-from .reward import RewardResult
-from .utils import render_prompt
-
-if TYPE_CHECKING:
-    from .reward import RewardFunction
+from .models import ModelFactory
+from .types import (
+    Action,
+    Observation,
+    RewardFunction,
+    StepResult,
+    TerminationReason,
+    TokenObservation,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class TerminationReason(str, Enum):
-    """Reasons why an episode might end."""
-
-    NOT_TERMINATED = "not_terminated"
-    TASK_COMPLETE = "task_complete"
-    MAX_TOOL_ITERATIONS_REACHED = "max_tool_iterations_reached"
-    MAX_TOKENS_REACHED = "max_tokens_reached"
-    AGENT_ERROR = "agent_error"
-
-    @property
-    def is_terminated(self) -> bool:
-        """Episode ended naturally (task complete or agent error)."""
-        return self in {TerminationReason.TASK_COMPLETE, TerminationReason.AGENT_ERROR}
-
-    @property
-    def is_truncated(self) -> bool:
-        """Episode ended due to limits (tools/tokens)."""
-        return self in {TerminationReason.MAX_TOOL_ITERATIONS_REACHED, TerminationReason.MAX_TOKENS_REACHED}
-
-    @property
-    def is_done(self) -> bool:
-        """Episode has ended (either terminal or truncation)."""
-        return self != TerminationReason.NOT_TERMINATED
-
-
-class StepResult(BaseModel):
-    """Result of a single environment step."""
-
-    observation: Observation
-    reward: RewardResult | None = None
-    termination_reason: TerminationReason = TerminationReason.NOT_TERMINATED
-
-
 class Environment:
-    """Base class for strands-env environments with streamlined agent loop.
+    """Base RL environment for tool-using Strands agents.
 
-    A minimal tool-using environment implementation should usually override:
-    - get_tools(): Provide environment-specific tools
-
-    Important methods to override when needed:
-    - reset(): Reset the environment state for a new episode
-    - cleanup(): Clean up resources (e.g., sandbox containers)
+    Override `get_tools()` at minimum. Optionally override `reset()`, `cleanup()`,
+    or `compute_metrics()` for custom behaviour.
     """
 
     default_system_prompt_path: ClassVar[Path | None] = None
@@ -94,43 +51,26 @@ class Environment:
     def __init__(
         self,
         *,
-        model_config: ModelConfig,
+        model_factory: ModelFactory,
         system_prompt: str | None = None,
         reward_fn: RewardFunction | None = None,
         max_tool_iterations: int = 10,
         verbose: bool = False,
     ):
-        self.model_config = model_config
+        self.model_factory = model_factory
         self.reward_fn = reward_fn
         self.max_tool_iterations = max_tool_iterations
         self.verbose = verbose
 
-        # Load system prompt from argument or default path
         path = self.default_system_prompt_path
-        self.system_prompt = system_prompt or (render_prompt(path) if path and path.exists() else None)
-
-    # -------------------------------------------------------------------------
-    # Core API: reset, step, cleanup
-    # -------------------------------------------------------------------------
+        self.system_prompt = system_prompt or (path.read_text() if path and path.exists() else None)
 
     async def reset(self) -> None:
-        """Reset the environment for a new episode.
-
-        Override in subclasses to add environment-specific initialization.
-        """
+        """Reset for a new episode. Override for environment-specific init."""
         pass
 
     async def step(self, action: Action) -> StepResult:
-        """Execute one step in the environment.
-
-        Args:
-            action: The action containing message and task_context.
-                   task_context.conversation_history is used for multi-turn.
-
-        Returns:
-            StepResult with observation, reward, and termination status.
-        """
-        # Create ephemeral agent and invoke
+        """Run one agent episode and return observation + reward + termination."""
         conversation_history = action.task_context.conversation_history
         tool_limiter = ToolIterationLimiter(self.max_tool_iterations)
         agent = self.create_agent(conversation_history, tool_limiter)
@@ -139,9 +79,8 @@ class Environment:
             await agent.invoke_async(action.message)
         except Exception as e:
             error = e
-        termination_reason = self.check_termination(error)
+        termination_reason = TerminationReason.from_error(error)
 
-        # Build observation, metrics, and step result
         step_messages = list(agent.messages)[len(conversation_history) :]
         token_obs = TokenObservation.from_token_manager(agent.model.token_manager)
         tool_parse_errors = getattr(agent.model, "tool_parse_errors", None)
@@ -155,28 +94,23 @@ class Environment:
         step_result.reward = (
             (await self.reward_fn.compute(action=action, step_result=step_result)) if self.reward_fn else None
         )
-
         return step_result
 
     async def cleanup(self) -> None:
-        """Clean up resources. Override in subclasses."""
+        """Release resources. Override in subclasses."""
         pass
 
-    # -------------------------------------------------------------------------
-    # Overridable: Tools, hooks, termination, metrics
-    # -------------------------------------------------------------------------
-
     def get_tools(self) -> list:
-        """Return tools for the agent. Override in subclasses."""
+        """Tools available to the agent. Override in subclasses."""
         return []
 
     def get_hooks(self) -> list:
-        """Return hooks for the agent. Override and call super() to add more."""
+        """Agent hooks. Override and call `super()` to extend."""
         return []
 
     def create_agent(self, conversation_history: Messages, tool_limiter: ToolIterationLimiter) -> Agent:
-        """Create an ephemeral strands Agent with fresh token manager."""
-        model = self.model_config.create_model()
+        """Create an ephemeral Strands Agent with a fresh `TokenManager`."""
+        model = self.model_factory()
         model.token_manager = TokenManager()
         return Agent(
             model=model,
@@ -187,48 +121,21 @@ class Environment:
             callback_handler=PrintingCallbackHandler() if self.verbose else None,
         )
 
-    def check_termination(self, error: Exception | None = None) -> TerminationReason:
-        """Check for termination conditions. Override for custom termination logic."""
-
-        # Return task complete if there's no error
-        if error is None:
-            return TerminationReason.TASK_COMPLETE
-
-        # Unwrap EventLoopException to get the underlying cause
-        cause = error.__cause__ if isinstance(error, EventLoopException) else error
-
-        match cause:
-            case MaxToolIterationsReachedError():
-                reason = TerminationReason.MAX_TOOL_ITERATIONS_REACHED
-            case MaxTokensReachedException():
-                reason = TerminationReason.MAX_TOKENS_REACHED
-            case _:
-                reason = TerminationReason.AGENT_ERROR
-
-        logger.warning(f"Step terminated: {reason.value} - {cause}")
-        return reason
-
     def compute_metrics(
         self,
         event_loop_metrics: EventLoopMetrics,
         tool_parse_errors: dict[str, int] | None = None,
     ) -> dict[str, Any]:
-        """Compute metrics for the current step. Override to add custom metrics.
-
-        Args:
-            event_loop_metrics: Metrics from the strands event loop.
-            tool_parse_errors: Parse errors per tool name from `SGLangModel` (training only).
-        """
+        """Extract metrics from the event loop. Override to add custom metrics."""
         usage = event_loop_metrics.accumulated_usage
         metrics_data = event_loop_metrics.accumulated_metrics
 
-        # Per-tool metrics (merge parse errors if available)
         per_tool_metrics = {
             name: {
                 "calls": tm.call_count,
                 "successes": tm.success_count,
                 "errors": tm.error_count,
-                "parse_errors": (tool_parse_errors or {}).get(name, 0),  # only valid for SGLangModel
+                "parse_errors": (tool_parse_errors or {}).get(name, 0),
                 "latency_s": round(tm.total_time, 4),
             }
             for name, tm in event_loop_metrics.tool_metrics.items()

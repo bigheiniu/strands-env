@@ -26,8 +26,6 @@ from strands.types.content import Message, Messages
 from strands.types.exceptions import EventLoopException, MaxTokensReachedException
 from strands_sglang import MaxToolIterationsReachedError, TokenManager
 
-from .utils import extract_text_content
-
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -107,11 +105,18 @@ class Observation(BaseModel):
     tokens: TokenObservation | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
 
-    def get_final_response(self) -> str | None:
+    @property
+    def final_response(self) -> str | None:
+        return self.get_final_response(self.messages)
+
+    @staticmethod
+    def get_final_response(messages: Messages) -> str | None:
         """Extract text from the last assistant message, or None."""
-        if not self.messages or self.messages[-1].get("role") != "assistant":
+        if not messages or messages[-1].get("role") != "assistant":
             return None
-        return extract_text_content(self.messages[-1])
+        content = messages[-1].get("content", [])
+        texts = [block["text"] for block in content if isinstance(block, dict) and "text" in block]
+        return "\n".join(texts) if texts else None
 
 
 # ---------------------------------------------------------------------------
