@@ -23,7 +23,6 @@ from typing import Any, ClassVar
 from strands import Agent
 from strands.handlers.callback_handler import PrintingCallbackHandler
 from strands.telemetry.metrics import EventLoopMetrics
-from strands.types.content import Messages
 from strands_sglang import TokenManager, ToolIterationLimiter
 
 from .models import ModelFactory
@@ -73,7 +72,16 @@ class Environment:
         """Run one agent episode and return observation + reward + termination."""
         conversation_history = action.task_context.conversation_history
         tool_limiter = ToolIterationLimiter(self.max_tool_iterations)
-        agent = self.create_agent(conversation_history, tool_limiter)
+        model = self.model_factory()
+        model.token_manager = TokenManager()
+        agent = Agent(
+            model=model,
+            messages=list(conversation_history),
+            tools=list(self.get_tools()),
+            system_prompt=self.system_prompt,
+            hooks=[tool_limiter] + list(self.get_hooks()),
+            callback_handler=PrintingCallbackHandler() if self.verbose else None,
+        )
         error = None
         try:
             await agent.invoke_async(action.message)
@@ -107,19 +115,6 @@ class Environment:
     def get_hooks(self) -> list:
         """Agent hooks. Override and call `super()` to extend."""
         return []
-
-    def create_agent(self, conversation_history: Messages, tool_limiter: ToolIterationLimiter) -> Agent:
-        """Create an ephemeral Strands Agent with a fresh model instance to avoid cross-step contamination."""
-        model = self.model_factory()
-        model.token_manager = TokenManager()  # only used for SGLangModel but harmless for other models
-        return Agent(
-            model=model,
-            messages=list(conversation_history),
-            tools=self.get_tools(),
-            system_prompt=self.system_prompt,
-            hooks=self.get_hooks() + [tool_limiter],
-            callback_handler=PrintingCallbackHandler() if self.verbose else None,
-        )
 
     def compute_metrics(
         self,
