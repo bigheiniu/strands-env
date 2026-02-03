@@ -65,14 +65,7 @@ class TokenObservation(BaseModel):
 
     @classmethod
     def from_token_manager(cls, token_manager: TokenManager) -> TokenObservation | None:
-        """Create from a TokenManager instance.
-
-        Extracts tokens in slime-compatible format:
-        - token_ids: tm.token_ids
-        - prompt_length: len(tm.initial_prompt)
-        - loss_mask: tm.loss_mask
-        - logprobs: tm.logprobs
-        """
+        """Create from `StrandsSGLang`'s `TokenManager` instance."""
         if len(token_manager) == 0:
             return None
         return cls(
