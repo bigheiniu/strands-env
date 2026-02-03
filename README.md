@@ -6,7 +6,7 @@ RL environments for [Strands](https://github.com/strands-agents/sdk-python) agen
 
 ## Define an environment
 
-Subclass `Environment` and return your tools:
+Subclass `Environment` and customize your tools:
 
 ```python
 from strands_tools import calculator
