@@ -39,11 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 class Environment:
-    """Base RL environment for tool-using Strands agents.
-
-    Override `get_tools()` at minimum. Optionally override `reset()`, `cleanup()`,
-    or `compute_metrics()` for custom behaviour.
-    """
+    """Base RL rollout environment for Strands agents."""
 
     default_system_prompt_path: ClassVar[Path | None] = None
 
