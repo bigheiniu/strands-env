@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "strands-sglang @ git+https://github.com/horizon-rl/strands-sglang.git@main",
+    "strands-sglang>=0.1.2",
     "strands-agents-tools",
 ]
 
