@@ -93,7 +93,7 @@ class Evaluator:
         self.results = defaultdict(list)
         self.completed_ids = set()
 
-        with open(self.output_path) as f:
+        with open(self.output_path, encoding="utf-8") as f:
             for line in f:
                 data = json.loads(line)
                 problem_id = data.pop("problem_id")
@@ -106,12 +106,12 @@ class Evaluator:
 
     def save_results(self) -> None:
         """Write all samples to results file."""
-        with open(self.output_path, "w") as f:
+        with open(self.output_path, "w", encoding="utf-8") as f:
             for problem_id, samples in self.results.items():
                 for sample in samples:
                     data = sample.model_dump()
                     data["problem_id"] = problem_id
-                    f.write(json.dumps(data) + "\n")
+                    f.write(json.dumps(data, ensure_ascii=False) + "\n")
 
         total = sum(len(samples) for samples in self.results.values())
         logger.info(f"Saved {total} samples to: {self.output_path}")
