@@ -38,9 +38,6 @@ from strands_env.environments.simple_math_env import SimpleMathEnv
 from strands_env.eval import AIMEEvaluator
 from strands_env.rewards.math_reward import MathRewardFunction
 
-logger = logging.getLogger(__name__)
-
-
 # ---------------------------------------------------------------------------
 # Model factory helpers
 # ---------------------------------------------------------------------------
@@ -93,7 +90,6 @@ def _create_bedrock_factory(model_id: str | None) -> ModelFactory:
 @click.option("--k-values", default="1", help="Comma-separated k values for pass@k (e.g., '1,5,8')")
 @click.option("--max-concurrency", default=10, type=int, help="Max concurrent evaluations")
 @click.option("--output", default="aime_results.jsonl", help="Output file for results")
-@click.option("--verbose", is_flag=True, help="Enable verbose logging")
 def main(
     backend: str,
     model_id: str | None,
@@ -103,13 +99,9 @@ def main(
     k_values: str,
     max_concurrency: int,
     output: str,
-    verbose: bool,
 ) -> None:
     """Run pass@k evaluation on AIME math problems."""
-    if verbose:
-        logging.basicConfig(level=logging.INFO)
-    else:
-        logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     asyncio.run(
         run_eval(
@@ -138,8 +130,10 @@ async def run_eval(
     model_factory = create_model_factory(backend, model_id, sglang_base_url)
     reward_fn = MathRewardFunction()
 
-    async def env_factory(action):
-        return SimpleMathEnv(model_factory=model_factory, reward_fn=reward_fn)
+    async def env_factory(_):
+        env = SimpleMathEnv(model_factory=model_factory, reward_fn=reward_fn)
+        env.get_tools = lambda: []
+        return env
 
     evaluator = AIMEEvaluator(
         env_factory=env_factory,
