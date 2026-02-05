@@ -50,7 +50,6 @@ class AIMEEvaluator(Evaluator):
 
     def load_dataset(self, version: str = "2024") -> Iterable[Action]:
         """Load AIME dataset from HuggingFace."""
-
         logger.info(f"Loading AIME {version} dataset from: {AIME_HF_PATHS[version]['path']}")
         dataset = load_dataset(AIME_HF_PATHS[version]["path"], split=AIME_HF_PATHS[version]["split"])
 
