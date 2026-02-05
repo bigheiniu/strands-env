@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from strands import Agent
-from strands.handlers.callback_handler import PrintingCallbackHandler
+from strands.handlers.callback_handler import PrintingCallbackHandler, null_callback_handler
 from strands.telemetry.metrics import EventLoopMetrics
 from strands_sglang import TokenManager, ToolIterationLimiter
 
@@ -76,7 +76,7 @@ class Environment:
             tools=list(self.get_tools()),
             system_prompt=self.system_prompt,
             hooks=[tool_limiter] + list(self.get_hooks()),
-            callback_handler=PrintingCallbackHandler() if self.verbose else None,
+            callback_handler=PrintingCallbackHandler() if self.verbose else null_callback_handler,
         )
         error = None
         try:
