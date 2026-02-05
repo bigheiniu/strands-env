@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .aime import AIMEEvaluator
 from .evaluator import EvalSample, Evaluator
 
 __all__ = [
-    "Evaluator",
+    "AIMEEvaluator",
     "EvalSample",
+    "Evaluator",
 ]

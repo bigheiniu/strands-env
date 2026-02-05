@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from strands_env.core import Action, Environment, Observation, RewardResult, StepResult, TaskContext
-from strands_env.eval import EvalSample, Evaluator
+from strands_env.eval import AIMEEvaluator, EvalSample, Evaluator
 
 # ---------------------------------------------------------------------------
 # EvalSample
@@ -285,3 +285,53 @@ class TestComputePassAtK:
         )
         result = Evaluator.compute_pass_at_k({"p1": [sample]}, k_values=[1])
         assert result[1] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# AIMEEvaluator
+# ---------------------------------------------------------------------------
+
+
+class TestAIMEEvaluator:
+    @pytest.fixture
+    def mock_factory(self):
+        async def factory(action):
+            env = MagicMock(spec=Environment)
+            env.reset = AsyncMock()
+            env.step = AsyncMock(return_value=StepResult(observation=Observation()))
+            env.cleanup = AsyncMock()
+            return env
+
+        return factory
+
+    def test_load_dataset(self, mock_factory, tmp_path, mocker):
+        """Load AIME problems from HuggingFace dataset."""
+        mock_data = [
+            {"id": "aime_2024_1", "problem": "Find x such that x^2 = 4", "answer": "2"},
+            {"id": "aime_2024_2", "problem": "What is 5 + 7?", "answer": "12"},
+        ]
+        mocker.patch("strands_env.eval.aime.load_dataset", return_value=mock_data)
+
+        evaluator = AIMEEvaluator(env_factory=mock_factory, output_path=tmp_path / "results.jsonl")
+        actions = evaluator.load_dataset("2024")
+
+        assert len(actions) == 2
+        assert actions[0].message == "Find x such that x^2 = 4"
+        assert actions[0].task_context.ground_truth == "2"
+
+    def test_skips_invalid_rows(self, mock_factory, tmp_path, mocker):
+        """Skip rows missing required fields."""
+        mock_data = [
+            {"problem": "Valid", "answer": "1"},
+            {"problem": "Missing answer"},
+            {"answer": "Missing problem"},
+            {"problem": "Also valid", "answer": "2"},
+        ]
+        mocker.patch("strands_env.eval.aime.load_dataset", return_value=mock_data)
+
+        evaluator = AIMEEvaluator(env_factory=mock_factory, output_path=tmp_path / "results.jsonl")
+        actions = evaluator.load_dataset("2024")
+
+        assert len(actions) == 2
+        assert actions[0].message == "Valid"
+        assert actions[1].message == "Also valid"
