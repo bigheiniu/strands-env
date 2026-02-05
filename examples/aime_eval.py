@@ -92,7 +92,6 @@ def _create_bedrock_factory(model_id: str | None) -> ModelFactory:
 @click.option("--sglang-base-url", default="http://localhost:30000", help="SGLang server URL")
 @click.option("--aime-version", default="2024", type=click.Choice(["2024", "2025"]), help="AIME dataset version")
 @click.option("--n-rollouts", default=1, type=int, help="Number of rollouts per problem")
-@click.option("--k-values", default="1", help="Comma-separated k values for pass@k (e.g., '1,5,8')")
 @click.option("--max-concurrency", default=10, type=int, help="Max concurrent evaluations")
 @click.option("--output", default="aime_results.jsonl", help="Output file for results")
 def main(
@@ -101,12 +100,15 @@ def main(
     sglang_base_url: str,
     aime_version: str,
     n_rollouts: int,
-    k_values: str,
     max_concurrency: int,
     output: str,
 ) -> None:
     """Run pass@k evaluation on AIME math problems."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    # Suppress strands library logging (can print model output during exceptions)
+    # Keep strands_env logger at INFO for progress logging
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.getLogger("strands").setLevel(logging.CRITICAL)
+    logging.getLogger("strands_env").setLevel(logging.INFO)
 
     asyncio.run(
         run_eval(
@@ -115,7 +117,6 @@ def main(
             sglang_base_url=sglang_base_url,
             aime_version=aime_version,
             n_rollouts=n_rollouts,
-            k_values=[int(k) for k in k_values.split(",")],
             max_concurrency=max_concurrency,
             output=output,
         )
@@ -128,7 +129,6 @@ async def run_eval(
     sglang_base_url: str,
     aime_version: str,
     n_rollouts: int,
-    k_values: list[int],
     max_concurrency: int,
     output: str,
 ) -> None:
@@ -137,6 +137,7 @@ async def run_eval(
 
     async def env_factory(_):
         env = SimpleMathEnv(model_factory=model_factory, reward_fn=reward_fn, verbose=False)
+        env.system_prompt = None
         env.get_tools = lambda: []
         return env
 
@@ -157,8 +158,8 @@ async def run_eval(
     click.echo(f"\nResults saved to: {output}")
     click.echo(f"Total samples: {sum(len(samples) for samples in results.values())}")
 
-    pass_at_k = evaluator.compute_pass_at_k(results, k_values=k_values)
-    click.echo("\npass@k metrics:")
+    pass_at_k = evaluator.compute_pass_at_k(results, k_values=list(range(1, n_rollouts + 1)))
+    click.echo(f"\npass@k metrics given (n={n_rollouts}):")
     for k, score in pass_at_k.items():
         click.echo(f"  pass@{k}: {score:.4f}")
 
