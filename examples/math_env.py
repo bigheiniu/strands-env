@@ -77,7 +77,7 @@ def _create_sglang_factory(model_id: str | None, sglang_base_url: str) -> ModelF
 def _create_bedrock_factory(model_id: str | None) -> ModelFactory:
     import boto3
 
-    model_id = model_id or "us.anthropic.claude-sonnet-4-20250514"
+    model_id = model_id or "us.anthropic.claude-sonnet-4-20250514-v1:0"
     click.echo(f"Using Bedrock model: {model_id}")
     return bedrock_model_factory(model_id=model_id, boto_session=boto3.Session())
 

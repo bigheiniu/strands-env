@@ -65,7 +65,12 @@ def _create_sglang_factory(model_id: str | None, sglang_base_url: str) -> ModelF
 
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     client = SGLangClient(base_url)
-    return sglang_model_factory(model_id=model_id, tokenizer=tokenizer, client=client)
+    return sglang_model_factory(
+        model_id=model_id,
+        tokenizer=tokenizer,
+        client=client,
+        sampling_params={"max_new_tokens": 16384, "temperature": 0.7, "top_p": 0.95, "top_k": 20},
+    )
 
 
 def _create_bedrock_factory(model_id: str | None) -> ModelFactory:
@@ -131,7 +136,7 @@ async def run_eval(
     reward_fn = MathRewardFunction()
 
     async def env_factory(_):
-        env = SimpleMathEnv(model_factory=model_factory, reward_fn=reward_fn)
+        env = SimpleMathEnv(model_factory=model_factory, reward_fn=reward_fn, verbose=False)
         env.get_tools = lambda: []
         return env
 
