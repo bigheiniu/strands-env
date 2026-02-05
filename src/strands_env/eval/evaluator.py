@@ -172,6 +172,7 @@ class Evaluator:
         tasks = [process(pid, sid, action) for pid, sid, action in to_process]
         await asyncio.gather(*tasks)
 
+        logger.info(f"Evaluation completed: {completed_counter}/{total} samples completed")
         self.save_results()
         return dict(self.results)
 
