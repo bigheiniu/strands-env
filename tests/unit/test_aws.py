@@ -130,6 +130,34 @@ class TestGetAssumedRoleSession:
         # assume_role should only be called once due to caching
         assert mock_sts.assume_role.call_count == 1
 
+    @patch("strands_env.utils.aws.boto3.client")
+    def test_has_refreshable_credentials(self, mock_boto3_client):
+        """Session should have RefreshableCredentials with refresh callback."""
+        from datetime import datetime, timedelta, timezone
+
+        from botocore.credentials import RefreshableCredentials
+
+        mock_sts = MagicMock()
+        mock_sts.assume_role.return_value = {
+            "Credentials": {
+                "AccessKeyId": "AKIA_TEST",
+                "SecretAccessKey": "secret_test",
+                "SessionToken": "token_test",
+                "Expiration": datetime.now(timezone.utc) + timedelta(hours=1),
+            }
+        }
+        mock_boto3_client.return_value = mock_sts
+
+        role_arn = "arn:aws:iam::123456789:role/TestRole"
+        session = get_assumed_role_session(role_arn=role_arn)
+
+        # Get the underlying botocore credentials directly
+        botocore_creds = session._session._credentials
+
+        # Verify it's RefreshableCredentials with a refresh callback
+        assert isinstance(botocore_creds, RefreshableCredentials)
+        assert botocore_creds._refresh_using is not None
+
 
 class TestClearSessions:
     """Tests for clear_sessions."""
