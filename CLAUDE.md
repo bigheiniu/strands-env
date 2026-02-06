@@ -49,13 +49,29 @@ pytest tests/integration/ -v
 
 ## Architecture
 
-The package lives in `src/strands_env/core/` with three modules:
+The package lives in `src/strands_env/` with these modules:
+
+### `core/`
 
 **types.py** — All data types. `Action` carries a user message + `TaskContext` (ground truth, conversation history, arbitrary metadata via `extra="allow"`). `Observation` holds messages, metrics, and optional `TokenObservation` for TITO training. `TerminationReason` maps agent exceptions to enum values via `from_error()` which walks exception cause chains. `StepResult` bundles observation + reward + termination reason.
 
 **models.py** — `ModelFactory = Callable[[], Model]` type and three factory functions (`sglang_model_factory`, `bedrock_model_factory`, `openai_model_factory`). Each returns a zero-arg lambda that creates a fresh Model instance per `step()` call for concurrent isolation. Bedrock and OpenAI remap `max_new_tokens` → `max_tokens` with a shallow dict copy to avoid mutating defaults.
 
 **environment.py** — Base `Environment` class. `step(action)` creates a fresh model via factory, attaches a `TokenManager`, builds an `Agent` with tools/hooks (always includes `ToolIterationLimiter`), runs `invoke_async`, then collects metrics and optional reward. Subclasses override `get_tools()` and `get_hooks()` to customize. Messages are sliced so only new messages from the current step appear in the observation.
+
+### `eval/`
+
+**evaluator.py** — `Evaluator` class orchestrates concurrent rollouts with checkpointing and pass@k metrics. Takes an async `env_factory` for flexible environment creation. Uses tqdm with `logging_redirect_tqdm` for clean progress output. Subclasses implement `load_dataset()` for different benchmarks.
+
+**metrics.py** — `pass_at_k_metric` implements the unbiased pass@k estimator. `MetricFn` type alias for pluggable metrics.
+
+**aime.py** — `AIMEEvaluator` subclass for AIME benchmark evaluation.
+
+### `utils/`
+
+**sglang.py** — SGLang client caching with `@lru_cache`. `get_cached_client(base_url, max_connections)` for connection pooling. `get_cached_client_from_slime_args(args)` for slime RL training integration.
+
+**aws.py** — AWS boto3 session caching. `get_boto3_session(region, profile_name)` with `@lru_cache` (boto3 handles credential refresh). `get_assumed_role_session(role_arn, region)` uses `RefreshableCredentials` for programmatic role assumption with auto-refresh.
 
 ### Key Design Decisions
 

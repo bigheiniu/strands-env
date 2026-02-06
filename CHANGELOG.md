@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`Evaluator`**: Concurrent evaluation orchestrator with checkpointing, resume, and pass@k metrics.
+  - tqdm progress bar with `logging_redirect_tqdm` for clean output
+  - `n_samples_per_prompt` for pass@k evaluation
+  - JSONL checkpointing with automatic resume
+- **`AIMEEvaluator`**: AIME benchmark evaluator subclass.
+- **`MathRewardFunction`**: Math reward using `math-verify` for symbolic equivalence checking.
+- **`utils/sglang.py`**: SGLang client caching utilities.
+  - `get_cached_client(base_url, max_connections)` with `lru_cache`
+  - `get_cached_client_from_slime_args(args)` for slime RL training integration
+- **`utils/aws.py`**: AWS boto3 session caching utilities.
+  - `get_boto3_session(region, profile_name)` with `lru_cache`
+  - `get_assumed_role_session(role_arn, region)` with `RefreshableCredentials` for auto-refresh
+- Added `boto3`, `datasets`, `tqdm` to main dependencies.
+
 ## [0.0.2] - 2026-02-03
 
 ### Fixed
