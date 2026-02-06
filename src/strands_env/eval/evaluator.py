@@ -47,6 +47,9 @@ class EvalSample(BaseModel):
 class Evaluator:
     """Evaluator for running concurrent environment evaluations."""
 
+    benchmark_name: str = ""
+    """Benchmark identifier. Override in subclasses."""
+
     def __init__(
         self,
         env_factory: AsyncEnvFactory,
@@ -68,24 +71,22 @@ class Evaluator:
             keep_tokens: Keep token-level observation in results (only valid for `SGLangModel` backends).
         """
         self.env_factory: AsyncEnvFactory = env_factory
-
-        # Configuration
         self.max_concurrency = max_concurrency
         self.n_rollouts = n_rollouts
         self.output_path = Path(output_path)
         self.save_interval = save_interval
         self.keep_tokens = keep_tokens
 
-        # Runtime state: {problem_id: [samples]}
+        # Runtime state
         self.results: dict[str, list[EvalSample]] = defaultdict(list)
-        self.completed_ids: set[str] = set()  # Tracks individual sample IDs for checkpoint
+        self.completed_ids: set[str] = set()
 
     def load_dataset(self) -> Iterable[Action]:
-        """Load dataset from file. Override to implement custom dataset loading logic."""
-        raise NotImplementedError("Evaluator subclasses must implement load_dataset()")
+        """Load dataset. Override in subclasses."""
+        raise NotImplementedError("Subclasses must implement load_dataset()")
 
     def load_results(self) -> None:
-        """Load completed samples from results file."""
+        """Load completed samples from checkpoint file."""
         if not self.output_path.exists():
             return
 
@@ -100,11 +101,11 @@ class Evaluator:
                 self.results[problem_id].append(sample)
                 self.completed_ids.add(sample.action.task_context.id)
 
-        total = sum(len(samples) for samples in self.results.values())
-        logger.info(f"Loaded {total} completed samples from: {self.output_path}")
+        total = sum(len(s) for s in self.results.values())
+        logger.info(f"Resumed {total} samples from {self.output_path}")
 
     def save_results(self) -> None:
-        """Write all samples to results file."""
+        """Save all samples to checkpoint file."""
         with open(self.output_path, "w", encoding="utf-8") as f:
             for problem_id, samples in self.results.items():
                 for sample in samples:
@@ -112,35 +113,28 @@ class Evaluator:
                     data["problem_id"] = problem_id
                     f.write(json.dumps(data, ensure_ascii=False) + "\n")
 
-        total = sum(len(samples) for samples in self.results.values())
-        logger.info(f"Saved {total} samples to: {self.output_path}")
-
     async def evaluate_sample(self, action: Action) -> EvalSample:
         """Evaluate a single sample."""
         env = await self.env_factory(action)
         await env.reset()
         step_result = await env.step(action)
         if not self.keep_tokens:
-            # Token trajectory is usually not needed for evaluation.
             step_result.observation.tokens = None
         await env.cleanup()
         return EvalSample(action=action, step_result=step_result)
 
     async def run(self, actions: Iterable[Action]) -> dict[str, list[EvalSample]]:
-        """Run evaluation on a collection of actions.
-
-        Each action is duplicated `n_rollouts` times for pass@k computation.
-        Completed samples are saved incrementally and can be resumed via output_path.
+        """Run evaluation on actions with n_rollouts each.
 
         Args:
-            actions: `Iterable` of `Action`s to evaluate.
+            actions: Actions to evaluate.
 
         Returns:
-            Dict mapping problem_id to list of `EvalSample` rollouts.
+            Dict mapping problem_id to list of EvalSample rollouts.
         """
         self.load_results()
 
-        # Build list of (problem_id, sample_id, action) for processing
+        # Expand actions to (problem_id, sample_id, action) tuples
         to_process: list[tuple[str, str, Action]] = []
         for action in actions:
             problem_id = action.task_context.id
@@ -153,45 +147,36 @@ class Evaluator:
 
         semaphore = asyncio.Semaphore(self.max_concurrency)
         save_counter = 0
-        completed_counter = 0
+        completed = 0
         total = len(to_process)
 
         async def process(problem_id: str, sample_id: str, action: Action) -> None:
-            nonlocal save_counter, completed_counter
+            nonlocal save_counter, completed
             async with semaphore:
                 sample = await self.evaluate_sample(action)
                 self.results[problem_id].append(sample)
                 self.completed_ids.add(sample_id)
-                completed_counter += 1
+                completed += 1
                 save_counter += 1
                 if save_counter >= self.save_interval:
                     self.save_results()
-                    logger.info(f"Progress: {completed_counter}/{total} samples completed")
+                    logger.info(f"Progress: {completed}/{total}")
                     save_counter = 0
 
-        tasks = [process(pid, sid, action) for pid, sid, action in to_process]
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*[process(pid, sid, a) for pid, sid, a in to_process])
 
-        logger.info(f"Evaluation completed: {completed_counter}/{total} samples completed")
+        logger.info(f"Completed: {completed}/{total}")
         self.save_results()
         return dict(self.results)
 
     @staticmethod
     def _pass_at_k_single(n: int, c: int, k: int) -> float:
-        """Compute pass@k for a single problem using unbiased estimator.
-
-        pass@k = 1 - C(n-c, k) / C(n, k)
-
-        Uses log-space for numerical stability with large factorials.
-        """
+        """Compute pass@k for a single problem using unbiased estimator."""
         if n - c < k:
             return 1.0
         if c == 0:
             return 0.0
-
-        log_ratio = 0.0
-        for i in range(k):
-            log_ratio += math.log(n - c - i) - math.log(n - i)
+        log_ratio = sum(math.log(n - c - i) - math.log(n - i) for i in range(k))
         return 1.0 - math.exp(log_ratio)
 
     @staticmethod
@@ -200,30 +185,28 @@ class Evaluator:
         k_values: list[int] = [1],
         reward_threshold: float = 1.0,
     ) -> dict[int, float]:
-        """Compute pass@k metric using unbiased estimator.
+        """Compute pass@k metrics.
 
         Args:
-            results: Dict mapping problem_id to list of sample rollouts.
-            k_values: List of k values for pass@k computation.
-            reward_threshold: Reward threshold for considering a sample "passed" (default: 1.0).
+            results: Dict mapping problem_id to sample rollouts.
+            k_values: List of k values for pass@k.
+            reward_threshold: Reward threshold for "pass" (default: 1.0).
 
         Returns:
-            Dictionary mapping k to average pass@k score.
+            Dict mapping k to average pass@k score.
         """
         if not results:
             return {k: 0.0 for k in k_values}
 
         def is_correct(s: EvalSample) -> bool:
-            reward = s.step_result.reward
-            return reward is not None and reward.reward >= reward_threshold
+            r = s.step_result.reward
+            return r is not None and r.reward >= reward_threshold
 
-        # Compute pass@k for each k value
         pass_at_k = {}
         for k in k_values:
             scores = []
             for samples in results.values():
-                n = len(samples)
-                c = sum(1 for s in samples if is_correct(s))
+                n, c = len(samples), sum(1 for s in samples if is_correct(s))
                 if k <= n:
                     scores.append(Evaluator._pass_at_k_single(n, c, k))
             pass_at_k[k] = sum(scores) / len(scores) if scores else 0.0

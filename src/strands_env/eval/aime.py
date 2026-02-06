@@ -28,46 +28,37 @@ from .evaluator import Evaluator
 
 logger = logging.getLogger(__name__)
 
-AIME_HF_PATHS = {
-    "2024": {
-        "path": "HuggingFaceH4/aime_2024",
-        "split": "train",
-        "problem_field": "problem",
-        "answer_field": "answer",
-        "id_field": "id",
-    },
-    "2025": {
-        "path": "MathArena/aime_2025",
-        "split": "train",
-        "problem_field": "problem",
-        "answer_field": "answer",
-        "id_field": "id",
-    },
+_AIME_DATASETS = {
+    "2024": "HuggingFaceH4/aime_2024",
+    "2025": "MathArena/aime_2025",
 }
 
 
 class AIMEEvaluator(Evaluator):
     """Evaluator for AIME math competition problems."""
 
+    benchmark_name = "AIME"
+
     def load_dataset(self, version: Literal["2024", "2025"] = "2024") -> Iterable[Action]:
         """Load AIME dataset from HuggingFace."""
-        logger.info(f"Loading AIME {version} dataset from: {AIME_HF_PATHS[version]['path']}")
-        dataset = load_dataset(AIME_HF_PATHS[version]["path"], split=AIME_HF_PATHS[version]["split"])
+        self.benchmark_name = f"{self.benchmark_name}_{version}"
+        dataset = load_dataset(_AIME_DATASETS[version], split="train")
 
         actions = []
         for i, row in enumerate(dataset):
-            problem = row.get(AIME_HF_PATHS[version]["problem_field"])
-            answer = row.get(AIME_HF_PATHS[version]["answer_field"])
+            problem, answer = row.get("problem"), row.get("answer")
             if problem is None or answer is None:
-                logger.warning(f"Missing problem or answer fields in row {i}, skipping row")
+                logger.warning(f"Row {i}: missing problem/answer, skipped")
                 continue
-            sample_id = row.get(AIME_HF_PATHS[version]["id_field"]) or i
             actions.append(
                 Action(
                     message=str(problem),
-                    task_context=TaskContext(id=f"aime_{version}_{sample_id}", ground_truth=str(answer)),
+                    task_context=TaskContext(
+                        id=f"{self.benchmark_name}_{row.get('id', i)}",
+                        ground_truth=str(answer),
+                    ),
                 )
             )
 
-        logger.info(f"Loaded {len(actions)}/{len(dataset)} problems from AIME {version} dataset")
+        logger.info(f"[{self.benchmark_name}] Loaded {len(actions)}/{len(dataset)} problems")
         return actions
