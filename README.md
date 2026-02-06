@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/strands-env.svg)](https://pypi.org/project/strands-env/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-RL environment abstraction for [Strands Agents](https://github.com/strands-agents/sdk-python) — step, observe, reward.
+Standardizing environment infrastructure with [Strands Agents](https://github.com/strands-agents/sdk-python) — step, observe, reward.
 
 ## Features
 
