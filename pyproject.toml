@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "strands-env"
-version = "0.1.1"
-description = "RL environments for Strands Agents — step, observe, reward."
+version = "0.1.2.dev0"
+description = "Standardizing environment infrastructure with Strands Agents — step, observe, reward."
 authors = [{name = "Yuan He", email = "yuanhe.cs.ai@gmail.com"}]
 requires-python = ">=3.10"
 readme = "README.md"
