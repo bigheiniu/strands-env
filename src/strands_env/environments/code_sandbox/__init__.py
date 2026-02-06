@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Environments for strands-env."""
+"""Code sandbox environment using AWS Bedrock AgentCore Code Interpreter."""
 
-from .calculator import CalculatorEnv
-from .code_sandbox import CodeMode, CodeSandboxEnv
+from .env import CodeMode, CodeSandboxEnv
 
-__all__ = ["CalculatorEnv", "CodeMode", "CodeSandboxEnv"]
+__all__ = ["CodeMode", "CodeSandboxEnv"]

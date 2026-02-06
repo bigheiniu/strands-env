@@ -77,6 +77,15 @@ The package lives in `src/strands_env/` with these modules:
 
 **code_interpreter.py** — `CodeInterpreterToolkit` wraps AWS Bedrock AgentCore Code Interpreter. Provides `execute_code` (Python) and `execute_command` (shell) tools. Sessions are lazily created and can be cleaned up via `cleanup()`.
 
+### `environments/`
+
+**calculator/** — `CalculatorEnv` provides a simple calculator tool for math problems. Useful for testing and as a reference implementation.
+
+**code_sandbox/** — `CodeSandboxEnv` uses AWS Bedrock AgentCore Code Interpreter for sandboxed code execution. `CodeMode` enum controls tool availability:
+- `CODE`: Only `execute_code` (Python execution)
+- `TERMINAL`: Only `execute_command` (shell commands)
+- `CODE_AND_TERMINAL`: Both tools
+
 ### Key Design Decisions
 
 - **Factory pattern**: `ModelFactory` returns lambdas (not Model instances) so each `step()` gets a fresh model with clean token tracking state.

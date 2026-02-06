@@ -24,7 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tools/code_interpreter.py`**: `CodeInterpreterToolkit` for AWS Bedrock AgentCore Code Interpreter.
   - `execute_code` tool for running Python code
   - `execute_command` tool for running shell commands
-- Added `boto3`, `bedrock-agentcore`, `datasets`, `tqdm` to main dependencies.
+- **`environments/code_sandbox/`**: `CodeSandboxEnv` using AWS Bedrock AgentCore Code Interpreter.
+  - `CodeMode` enum for configurable tool availability (CODE, TERMINAL, CODE_AND_TERMINAL)
+  - Async `cleanup()` for session cleanup
+- **`environments/calculator/`**: `CalculatorEnv` renamed from SimpleMathEnv for clarity.
+- Added `boto3`, `datasets`, `tqdm` to main dependencies.
 
 ## [0.0.2] - 2026-02-03
 
