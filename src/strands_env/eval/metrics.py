@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 MetricFn = Callable[[dict[str, list["EvalSample"]]], dict[str, float]]
 
 
-def pass_at_k_metric(
+def compute_pass_at_k(
     results: dict[str, list["EvalSample"]],
     k_values: list[int],
     reward_threshold: float = 1.0,

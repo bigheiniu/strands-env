@@ -30,7 +30,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 from strands_env.core import Action, Environment, StepResult
 
-from .metrics import MetricFn, pass_at_k_metric
+from .metrics import MetricFn, compute_pass_at_k
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class Evaluator:
         """
         return [
             partial(
-                pass_at_k_metric,
+                compute_pass_at_k,
                 k_values=list(range(1, self.n_samples_per_prompt + 1)),
                 reward_threshold=1.0,
             )

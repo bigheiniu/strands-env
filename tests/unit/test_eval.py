@@ -6,7 +6,7 @@ import pytest
 
 from strands_env.core import Action, Environment, Observation, RewardResult, StepResult, TaskContext
 from strands_env.eval import AIME2024Evaluator, EvalSample, Evaluator
-from strands_env.eval.metrics import pass_at_k_metric
+from strands_env.eval.metrics import compute_pass_at_k
 
 # ---------------------------------------------------------------------------
 # EvalSample
@@ -208,17 +208,17 @@ class TestPassAtKMetric:
         )
 
     def test_empty_samples(self):
-        result = pass_at_k_metric({}, k_values=[1])
+        result = compute_pass_at_k({}, k_values=[1])
         assert result == {"pass@1": 0.0}
 
     def test_all_correct(self):
         results = {"p1": [self._make_sample(1.0, i) for i in range(5)]}
-        result = pass_at_k_metric(results, k_values=[1])
+        result = compute_pass_at_k(results, k_values=[1])
         assert result["pass@1"] == 1.0
 
     def test_none_correct(self):
         results = {"p1": [self._make_sample(0.0, i) for i in range(5)]}
-        result = pass_at_k_metric(results, k_values=[1])
+        result = compute_pass_at_k(results, k_values=[1])
         assert result["pass@1"] == 0.0
 
     def test_multiple_problems(self):
@@ -229,13 +229,13 @@ class TestPassAtKMetric:
             "p2": [self._make_sample(0.0, 0), self._make_sample(0.0, 1)],
         }
         # Average: (1.0 + 0.0) / 2 = 0.5
-        result = pass_at_k_metric(results, k_values=[1])
+        result = compute_pass_at_k(results, k_values=[1])
         assert result["pass@1"] == pytest.approx(0.5)
 
     def test_multiple_k_values(self):
         # p1: 1/5 correct
         results = {"p1": [self._make_sample(1.0 if i == 0 else 0.0, i) for i in range(5)]}
-        result = pass_at_k_metric(results, k_values=[1, 5])
+        result = compute_pass_at_k(results, k_values=[1, 5])
         # pass@1 = 1 - 4/5 = 0.2
         assert result["pass@1"] == pytest.approx(0.2)
         # pass@5 = 1.0 (n-c=4 < k=5, guaranteed to get the correct one)
@@ -244,16 +244,16 @@ class TestPassAtKMetric:
     def test_custom_reward_threshold(self):
         results = {"p1": [self._make_sample(0.5, 0)]}
         # Default threshold 1.0 - not correct
-        result = pass_at_k_metric(results, k_values=[1], reward_threshold=1.0)
+        result = compute_pass_at_k(results, k_values=[1], reward_threshold=1.0)
         assert result["pass@1"] == 0.0
         # Threshold 0.5 - correct
-        result = pass_at_k_metric(results, k_values=[1], reward_threshold=0.5)
+        result = compute_pass_at_k(results, k_values=[1], reward_threshold=0.5)
         assert result["pass@1"] == 1.0
 
     def test_k_larger_than_n_skipped(self):
         # Only 2 samples, k=5 - this problem is skipped
         results = {"p1": [self._make_sample(1.0, 0), self._make_sample(1.0, 1)]}
-        result = pass_at_k_metric(results, k_values=[5])
+        result = compute_pass_at_k(results, k_values=[5])
         assert result["pass@5"] == 0.0  # No problems have enough samples
 
     def test_none_reward_handled(self):
@@ -262,18 +262,18 @@ class TestPassAtKMetric:
             action=Action(message="q", task_context=TaskContext(id="p1_0")),
             step_result=StepResult(observation=Observation(), reward=None),
         )
-        result = pass_at_k_metric({"p1": [sample]}, k_values=[1])
+        result = compute_pass_at_k({"p1": [sample]}, k_values=[1])
         assert result["pass@1"] == 0.0
 
     def test_half_correct(self):
         # pass@1 = 1 - C(5,1)/C(10,1) = 1 - 5/10 = 0.5
         results = {"p1": [self._make_sample(1.0 if i < 5 else 0.0, i) for i in range(10)]}
-        result = pass_at_k_metric(results, k_values=[1])
+        result = compute_pass_at_k(results, k_values=[1])
         assert result["pass@1"] == pytest.approx(0.5)
 
     def test_one_correct_out_of_ten(self):
         results = {"p1": [self._make_sample(1.0 if i == 0 else 0.0, i) for i in range(10)]}
-        result = pass_at_k_metric(results, k_values=[1, 5])
+        result = compute_pass_at_k(results, k_values=[1, 5])
         # pass@1 = 1 - 9/10 = 0.1
         assert result["pass@1"] == pytest.approx(0.1)
         # pass@5 = 1 - C(9,5)/C(10,5) = 0.5

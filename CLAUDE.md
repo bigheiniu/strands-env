@@ -73,7 +73,7 @@ The package lives in `src/strands_env/` with these modules:
 
 **registry.py** — Benchmark registry with `@register(name)` decorator. `get_benchmark(name)` and `list_benchmarks()` for discovery.
 
-**metrics.py** — `pass_at_k_metric` implements the unbiased pass@k estimator. `MetricFn` type alias for pluggable metrics.
+**metrics.py** — `compute_pass_at_k` implements the unbiased pass@k estimator. `MetricFn` type alias for pluggable metrics.
 
 **aime.py** — `AIMEEvaluator` base class for AIME benchmarks. `AIME2024Evaluator` and `AIME2025Evaluator` registered as separate benchmarks with different dataset paths.
 

@@ -28,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reorganized examples: removed `aime_eval.py` and `common.py`, added `calculator_demo.py`.
-- Hook files moved to `examples/envs/`.
+- Environment hooks in `examples/envs/`.
+- Evaluator hooks in `examples/evaluators/` (with `simple_math_evaluator.py` example).
 
 ## [0.1.1] - 2026-02-06
 

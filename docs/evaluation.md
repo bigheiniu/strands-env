@@ -60,8 +60,9 @@ strands-env eval --evaluator <evaluator_file> --env <hook_file> [options]
 # Using registered benchmark
 strands-env eval aime-2024 --env examples/envs/calculator_env.py --backend sglang
 
-# Using custom evaluator hook
-strands-env eval --evaluator my_evaluator.py --env examples/envs/calculator_env.py --backend sglang
+# Using custom evaluator hook (see examples/evaluators/)
+strands-env eval --evaluator examples/evaluators/simple_math_evaluator.py \
+    --env examples/envs/calculator_env.py --backend sglang
 
 # Pass@8 evaluation with high concurrency
 strands-env eval aime-2024 --env examples/envs/calculator_env.py \
@@ -234,7 +235,7 @@ Override `get_metric_fns()` to customize metrics:
 ```python
 from functools import partial
 
-from strands_env.eval import Evaluator, pass_at_k_metric
+from strands_env.eval import Evaluator, compute_pass_at_k
 
 class MyEvaluator(Evaluator):
     benchmark_name = "my-benchmark"
@@ -245,7 +246,7 @@ class MyEvaluator(Evaluator):
     def get_metric_fns(self):
         # Include default pass@k plus custom metrics
         return [
-            partial(pass_at_k_metric, k_values=[1, 5, 10], reward_threshold=1.0),
+            partial(compute_pass_at_k, k_values=[1, 5, 10], reward_threshold=1.0),
             self.my_custom_metric,
         ]
 
