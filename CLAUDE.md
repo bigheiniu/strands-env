@@ -61,11 +61,11 @@ The package lives in `src/strands_env/` with these modules:
 
 ### `cli/`
 
-**__init__.py** — CLI entry point with `strands-env` command group. `list` shows registered benchmarks. `eval` runs benchmark evaluation with hook file.
+**__init__.py** — CLI entry point with `strands-env` command group. `list` shows registered benchmarks. `eval` runs benchmark evaluation with environment and optional evaluator hooks.
 
-**config.py** — Configuration dataclasses: `SamplingConfig`, `ModelConfig`, `EnvConfig`, `EvalConfig`. Passed to hook files and factory builders.
+**config.py** — Configuration dataclasses: `SamplingConfig`, `ModelConfig`, `EnvConfig`, `EvalConfig`. Each has `to_dict()` for serialization. Config saved to output directory for reproducibility.
 
-**utils.py** — `build_model_factory(config, max_concurrency)` creates SGLang or Bedrock model factories. `load_env_hook(path)` loads hook files. SGLang health check with clear error messages.
+**utils.py** — `build_model_factory(config, max_concurrency)` creates SGLang or Bedrock model factories. `load_env_hook(path)` loads environment hooks. `load_evaluator_hook(path)` loads evaluator hooks. SGLang health check with clear error messages.
 
 ### `eval/`
 

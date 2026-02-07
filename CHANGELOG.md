@@ -12,9 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLI** (`strands-env`)
   - `strands-env list`: List registered benchmarks.
   - `strands-env eval <benchmark> --env <hook_file>`: Run benchmark evaluation.
-  - Hook file pattern: Python files exporting `create_env_factory(model_factory, env_config)`.
-  - Support for `--backend sglang|bedrock`, `--profile`, `--role-arn`, and sampling options.
+  - `strands-env eval --evaluator <hook_file> --env <hook_file>`: Run with custom evaluator.
+  - Environment hook: Python files exporting `create_env_factory(model_factory, env_config)`.
+  - Evaluator hook: Python files exporting `EvaluatorClass` (Evaluator subclass).
+  - Support for `--backend sglang|bedrock`, `--profile-name`, `--role-arn`, and sampling options.
   - SGLang server health check with clear error messages.
+  - Saves `config.json` to output directory for reproducibility.
 - **Benchmark Registry**
   - `@register(name)` decorator for registering benchmark evaluators.
   - `get_benchmark(name)` and `list_benchmarks()` for discovery.
