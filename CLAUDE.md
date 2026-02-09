@@ -71,7 +71,7 @@ The package lives in `src/strands_env/` with these modules:
 
 **evaluator.py** — `Evaluator` class orchestrates concurrent rollouts with checkpointing and pass@k metrics. Takes an async `env_factory` for flexible environment creation. Uses tqdm with `logging_redirect_tqdm` for clean progress output. Subclasses implement `load_dataset()` for different benchmarks.
 
-**registry.py** — Benchmark registry with `@register(name)` decorator. `get_benchmark(name)` and `list_benchmarks()` for discovery.
+**registry.py** — Benchmark registry with `@register_eval(name)` decorator. `get_benchmark(name)` and `list_benchmarks()` for discovery.
 
 **metrics.py** — `compute_pass_at_k` implements the unbiased pass@k estimator. `MetricFn` type alias for pluggable metrics.
 

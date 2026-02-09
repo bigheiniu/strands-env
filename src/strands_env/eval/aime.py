@@ -25,7 +25,7 @@ from typing_extensions import override
 from strands_env.core import Action, TaskContext
 
 from .evaluator import Evaluator
-from .registry import register
+from .registry import register_eval
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class AIMEEvaluator(Evaluator):
             )
 
 
-@register("aime-2024")
+@register_eval("aime-2024")
 class AIME2024Evaluator(AIMEEvaluator):
     """AIME 2024 benchmark."""
 
@@ -67,7 +67,7 @@ class AIME2024Evaluator(AIMEEvaluator):
     dataset_path = "HuggingFaceH4/aime_2024"
 
 
-@register("aime-2025")
+@register_eval("aime-2025")
 class AIME2025Evaluator(AIMEEvaluator):
     """AIME 2025 benchmark."""
 

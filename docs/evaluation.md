@@ -150,7 +150,7 @@ def create_env_factory(model_factory: ModelFactory, env_config: EnvConfig):
 
 ## Custom Evaluators
 
-For custom benchmarks, subclass `Evaluator`. You can either register it with `@register` or use an evaluator hook file.
+For custom benchmarks, subclass `Evaluator`. You can either register it with `@register_eval` or use an evaluator hook file.
 
 ### Evaluator Hook File
 
@@ -186,15 +186,15 @@ strands-env eval --evaluator my_evaluator.py --env my_env.py --backend sglang
 
 ### Registered Evaluator
 
-Alternatively, use `@register` to make it available by name:
+Alternatively, use `@register_eval` to make it available by name:
 
 ```python
 from collections.abc import Iterable
 
 from strands_env.core import Action, TaskContext
-from strands_env.eval import Evaluator, register
+from strands_env.eval import Evaluator, register_eval
 
-@register("my-benchmark")
+@register_eval("my-benchmark")
 class MyEvaluator(Evaluator):
     benchmark_name = "my-benchmark"
 

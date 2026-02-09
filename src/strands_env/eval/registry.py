@@ -25,11 +25,11 @@ if TYPE_CHECKING:
 _BENCHMARKS: dict[str, type[Evaluator]] = {}
 
 
-def register(name: str):
+def register_eval(name: str):
     """Decorator to register a benchmark evaluator.
 
     Example:
-        @register("aime")
+        @register_eval("aime")
         class AIMEEvaluator(Evaluator):
             ...
     """

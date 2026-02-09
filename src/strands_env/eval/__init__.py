@@ -15,7 +15,7 @@
 from .aime import AIME2024Evaluator, AIME2025Evaluator, AIMEEvaluator
 from .evaluator import AsyncEnvFactory, EvalSample, Evaluator
 from .metrics import MetricFn, compute_pass_at_k
-from .registry import get_benchmark, list_benchmarks, register
+from .registry import get_benchmark, list_benchmarks, register_eval
 
 __all__ = [
     "AIME2024Evaluator",
@@ -28,5 +28,5 @@ __all__ = [
     "get_benchmark",
     "list_benchmarks",
     "compute_pass_at_k",
-    "register",
+    "register_eval",
 ]

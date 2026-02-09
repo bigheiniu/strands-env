@@ -6,7 +6,7 @@ from click.testing import CliRunner
 from strands_env.cli import cli
 from strands_env.eval import Evaluator, get_benchmark, list_benchmarks
 from strands_env.eval.registry import _BENCHMARKS
-from strands_env.eval.registry import register as register_benchmark
+from strands_env.eval.registry import register_eval as register_benchmark
 
 
 class TestBenchmarkRegistry:
