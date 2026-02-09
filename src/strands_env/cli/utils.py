@@ -81,10 +81,10 @@ def build_model_factory(config: ModelConfig, max_concurrency: int) -> ModelFacto
         if not config.model_id:
             raise click.ClickException("--model-id is required for Bedrock backend")
         if config.role_arn:
-            session = get_assumed_role_session(config.role_arn, config.region)
+            boto_session = get_assumed_role_session(config.role_arn, config.region)
         else:
-            session = get_boto3_session(config.region, config.profile_name)
-        return bedrock_model_factory(session, config.model_id, sampling)
+            boto_session = get_boto3_session(config.region, config.profile_name)
+        return bedrock_model_factory(model_id=config.model_id, boto_session=boto_session, sampling_params=sampling)
 
     else:
         raise click.ClickException(f"Unknown backend: {config.backend}")

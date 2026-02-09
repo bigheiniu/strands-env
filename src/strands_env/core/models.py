@@ -49,7 +49,7 @@ from strands.models import Model
 from strands.models.bedrock import BedrockModel
 from strands.models.openai import OpenAIModel
 from strands_sglang import SGLangClient, SGLangModel
-from strands_sglang.tool_parser import HermesToolCallParser, ToolCallParser
+from strands_sglang.tool_parsers import HermesToolParser, ToolParser
 from transformers import PreTrainedTokenizerBase
 
 #: Factory that produces a fresh `Model` per step (for concurrent step isolation).
@@ -67,7 +67,7 @@ def sglang_model_factory(
     model_id: str,
     tokenizer: PreTrainedTokenizerBase,
     client: SGLangClient,
-    tool_call_parser: ToolCallParser = HermesToolCallParser(),
+    tool_parser: ToolParser = HermesToolParser(),
     sampling_params: dict[str, Any] = DEFAULT_SAMPLING_PARAMS,
     enable_thinking: bool | None = None,
 ) -> ModelFactory:
@@ -83,7 +83,7 @@ def sglang_model_factory(
     return lambda: SGLangModel(
         tokenizer=tokenizer,
         client=client,
-        tool_call_parser=tool_call_parser,
+        tool_parser=tool_parser,
         params=sampling_params,
         model_id=model_id,
         return_logprobs=True,
