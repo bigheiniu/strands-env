@@ -23,7 +23,7 @@ Each function returns a `ModelFactory` (zero-arg callable that creates a fresh
     client = SGLangClient("http://localhost:30000")
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B")
     env = Environment(
-        model_factory=sglang_model_factory(model_id="Qwen/Qwen3-8B", tokenizer=tokenizer, client=client),
+        model_factory=sglang_model_factory(tokenizer=tokenizer, client=client),
     )
 
 Users can easily create their own model factories by implementing the `ModelFactory` type.
