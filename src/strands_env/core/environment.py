@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from strands import Agent
+from strands.agent.conversation_manager import ConversationManager, NullConversationManager
 from strands.handlers.callback_handler import PrintingCallbackHandler
 from strands.telemetry.metrics import EventLoopMetrics
 from strands_sglang import TokenManager, ToolIterationLimiter
@@ -76,6 +77,7 @@ class Environment:
             tools=list(self.get_tools()),
             system_prompt=self.system_prompt,
             hooks=[tool_limiter] + list(self.get_hooks()),
+            conversation_manager=self.get_conversation_manager(),
             callback_handler=PrintingCallbackHandler() if self.verbose else None,
         )
         error = None
@@ -111,6 +113,10 @@ class Environment:
     def get_hooks(self) -> list:
         """Agent hooks. Override and call `super()` to extend."""
         return []
+
+    def get_conversation_manager(self) -> ConversationManager:
+        """Conversation manager for context window handling. Override in subclasses."""
+        return NullConversationManager()
 
     def compute_metrics(
         self,
