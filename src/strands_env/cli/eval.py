@@ -201,6 +201,25 @@ def list_cmd():
     default=False,
     help="Keep token-level observations in results.",
 )
+# Synthetic benchmark specific
+@click.option(
+    "--data-dir",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Path to AWM-format data folder (required for 'synthetic' benchmark).",
+)
+@click.option(
+    "--scenarios",
+    type=str,
+    default=None,
+    help="Comma-separated list of scenario names to evaluate (default: all).",
+)
+@click.option(
+    "--max-tasks-per-scenario",
+    type=int,
+    default=None,
+    help="Maximum number of tasks per scenario (default: all).",
+)
 # Debug
 @click.option(
     "--debug",
@@ -236,6 +255,10 @@ def run_cmd(
     output: Path,
     save_interval: int,
     keep_tokens: bool,
+    # Synthetic-specific
+    data_dir: Path | None,
+    scenarios: str | None,
+    max_tasks_per_scenario: int | None,
     debug: bool,
 ):
     """Run benchmark evaluation.
@@ -267,6 +290,10 @@ def run_cmd(
     else:
         evaluator_cls = load_evaluator_hook(evaluator_path)
         benchmark_name = evaluator_cls.benchmark_name
+
+    # Validate synthetic-specific requirements
+    if benchmark_name == "synthetic" and data_dir is None:
+        raise click.ClickException("--data-dir is required for the 'synthetic' benchmark.")
 
     # Load hook file (validate before building model factory)
     env_factory_creator = load_env_hook(env_path)
@@ -318,8 +345,8 @@ def run_cmd(
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create evaluator
-    evaluator = evaluator_cls(
+    # Build evaluator kwargs
+    evaluator_kwargs = dict(
         env_factory=env_factory,
         max_concurrency=eval_config.max_concurrency,
         n_samples_per_prompt=eval_config.n_samples_per_prompt,
@@ -327,6 +354,17 @@ def run_cmd(
         save_interval=eval_config.save_interval,
         keep_tokens=eval_config.keep_tokens,
     )
+
+    # Pass synthetic-specific kwargs if provided
+    if data_dir is not None:
+        evaluator_kwargs["data_dir"] = data_dir
+    if scenarios is not None:
+        evaluator_kwargs["scenarios"] = [s.strip() for s in scenarios.split(",")]
+    if max_tasks_per_scenario is not None:
+        evaluator_kwargs["max_tasks_per_scenario"] = max_tasks_per_scenario
+
+    # Create evaluator
+    evaluator = evaluator_cls(**evaluator_kwargs)
 
     # Load dataset once (convert to list since we need to iterate twice if resolving system_prompt)
     actions = list(evaluator.load_dataset())
