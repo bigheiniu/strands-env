@@ -102,5 +102,6 @@ class SyntheticEvaluator(Evaluator):
                         ground_truth=None,
                         scenario=scenario,
                         task_idx=task_idx,
+                        data_dir=str(self.data_dir),
                     ),
                 )

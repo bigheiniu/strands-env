@@ -127,6 +127,16 @@ class TestSyntheticEvaluatorLoadDataset:
         assert ctx.task_idx == 0
         assert ctx.id == f"{SCENARIO_NAME}_0"
 
+    def test_action_has_data_dir_in_context(self, data_dir, mock_env_factory):
+        from strands_env.eval.benchmarks.synthetic import SyntheticEvaluator
+
+        evaluator = SyntheticEvaluator(
+            env_factory=mock_env_factory,
+            data_dir=data_dir,
+        )
+        actions = list(evaluator.load_dataset())
+        assert actions[0].task_context.data_dir == str(data_dir)
+
     def test_action_context_ids_are_unique(self, data_dir, mock_env_factory):
         from strands_env.eval.benchmarks.synthetic import SyntheticEvaluator
 
