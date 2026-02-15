@@ -184,3 +184,18 @@ class TestSyntheticEvaluatorBenchmarkName:
             data_dir=data_dir,
         )
         assert evaluator.benchmark_name == "synthetic"
+
+
+class TestSyntheticEvaluatorRegistered:
+    def test_registered_in_registry(self):
+        from strands_env.eval import get_benchmark
+
+        cls = get_benchmark("synthetic")
+        from strands_env.eval.benchmarks.synthetic import SyntheticEvaluator
+
+        assert cls is SyntheticEvaluator
+
+    def test_listed_in_benchmarks(self):
+        from strands_env.eval import list_benchmarks
+
+        assert "synthetic" in list_benchmarks()
