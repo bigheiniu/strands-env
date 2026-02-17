@@ -225,3 +225,6 @@ results/
 
 # Ignore eval output directories
 *_eval/
+
+# Release notes drafts (copied to GitHub Releases)
+docs/releases/
