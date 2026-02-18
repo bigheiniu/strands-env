@@ -532,10 +532,10 @@ class TestSyntheticEnvInit:
         assert env.config is config
         assert env.data_loader.data_dir == data_dir
 
-    def test_max_tool_iterations_default(self, data_dir, mock_model_factory):
+    def test_max_tool_iters_default(self, data_dir, mock_model_factory):
         config = SyntheticEnvConfig(scenario=SCENARIO_NAME, task_idx=0, data_dir=data_dir)
         env = SyntheticEnv(model_factory=mock_model_factory, config=config)
-        assert env.max_tool_iterations == 25
+        assert env.max_tool_iters == 25
 
     def test_initial_state_before_reset(self, data_dir, mock_model_factory):
         config = SyntheticEnvConfig(scenario=SCENARIO_NAME, task_idx=0, data_dir=data_dir)

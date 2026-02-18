@@ -45,7 +45,7 @@ def create_env_factory(model_factory: ModelFactory, env_config: EnvConfig):
             model_factory=model_factory,
             config=config,
             system_prompt=env_config.system_prompt,
-            max_tool_iterations=env_config.max_tool_iterations,
+            max_tool_iters=env_config.max_tool_iters,
         )
 
     return env_factory

@@ -265,16 +265,22 @@ class TestSyntheticEnvStep:
         assert len(result.observation.tokens.rollout_token_ids) > 0
 
     async def test_step_metrics(self, synth_env):
-        """Step produces expected metric keys."""
+        """Step produces expected metric keys with correct structure."""
         action = Action(message="How many users are in the system?")
         result = await synth_env.step(action)
 
         metrics = result.observation.metrics
         assert "message_count" in metrics
         assert "tool_iters" in metrics
+        assert "tool_calls" in metrics
         assert "model_calls" in metrics
-        assert "input_tokens" in metrics
-        assert "output_tokens" in metrics
+        assert metrics["model_calls"] >= 1
+        for key in ("input_tokens", "output_tokens"):
+            usage = metrics[key]
+            assert isinstance(usage, dict)
+            for subkey in ("total", "max", "mean", "min"):
+                assert subkey in usage
+                assert usage[subkey] > 0
 
     async def test_final_response(self, synth_env):
         """Observation provides final assistant response text."""
@@ -286,9 +292,9 @@ class TestSyntheticEnvStep:
         assert len(response) > 0
 
     async def test_tool_iteration_limit(self, data_dir, model_factory):
-        """Environment respects max_tool_iterations."""
+        """Environment respects max_tool_iters."""
         config = SyntheticEnvConfig(scenario=SCENARIO_NAME, task_idx=0, data_dir=data_dir)
-        env = SyntheticEnv(model_factory=model_factory, config=config, max_tool_iterations=1)
+        env = SyntheticEnv(model_factory=model_factory, config=config, max_tool_iters=1)
         await env.reset()
         try:
             action = Action(

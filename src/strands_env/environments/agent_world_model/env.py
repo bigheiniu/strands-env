@@ -73,14 +73,16 @@ class SyntheticEnv(Environment):
         config: SyntheticEnvConfig,
         system_prompt: str | None = None,
         reward_fn: RewardFunction | None = None,
-        max_tool_iterations: int = 25,
+        max_tool_iters: int = 25,
+        max_tool_calls: int | None = None,
         verbose: bool = False,
     ):
         super().__init__(
             model_factory=model_factory,
             system_prompt=system_prompt,
             reward_fn=None,
-            max_tool_iterations=max_tool_iterations,
+            max_tool_iters=max_tool_iters,
+            max_tool_calls=max_tool_calls,
             verbose=verbose,
         )
 
