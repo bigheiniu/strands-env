@@ -1,3 +1,17 @@
+# Copyright 2025 Horizon RL Contributors
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """General-purpose data loader for AWM-format (AgentWorldModel) data folders.
 
 Reads JSONL files and indexes entries by scenario name for efficient lookup.
@@ -37,15 +51,7 @@ class AWMDataLoader:
         self.data_dir = Path(data_dir)
         if not self.data_dir.is_dir():
             raise FileNotFoundError(f"Data directory not found: {self.data_dir}")
-
-        # Lazy caches — populated on first access
-        self._scenarios: dict[str, dict] | None = None
-        self._tasks: dict[str, list[str]] | None = None
-        self._db_schemas: dict[str, dict] | None = None
-        self._sample_data: dict[str, dict] | None = None
-        self._api_specs: dict[str, dict] | None = None
-        self._env_codes: dict[str, dict] | None = None
-        self._verifiers: dict[str, dict[int, dict]] | None = None
+        self._cache: dict[str, dict] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -78,47 +84,24 @@ class AWMDataLoader:
                 index[key] = entry
         return index
 
-    def _ensure_scenarios(self) -> dict[str, dict]:
-        if self._scenarios is None:
-            self._scenarios = self._index_by_scenario(self._FILE_MAP["scenarios"])
-        return self._scenarios
-
-    def _ensure_tasks(self) -> dict[str, list[str]]:
-        if self._tasks is None:
-            raw = self._index_by_scenario(self._FILE_MAP["tasks"])
-            self._tasks = {k: v.get("tasks", []) for k, v in raw.items()}
-        return self._tasks
-
-    def _ensure_db_schemas(self) -> dict[str, dict]:
-        if self._db_schemas is None:
-            self._db_schemas = self._index_by_scenario(self._FILE_MAP["db_schemas"])
-        return self._db_schemas
-
-    def _ensure_sample_data(self) -> dict[str, dict]:
-        if self._sample_data is None:
-            self._sample_data = self._index_by_scenario(self._FILE_MAP["sample_data"])
-        return self._sample_data
-
-    def _ensure_api_specs(self) -> dict[str, dict]:
-        if self._api_specs is None:
-            self._api_specs = self._index_by_scenario(self._FILE_MAP["api_specs"])
-        return self._api_specs
-
-    def _ensure_env_codes(self) -> dict[str, dict]:
-        if self._env_codes is None:
-            self._env_codes = self._index_by_scenario(self._FILE_MAP["env_codes"])
-        return self._env_codes
-
-    def _ensure_verifiers(self) -> dict[str, dict[int, dict]]:
-        if self._verifiers is None:
-            entries = self._read_jsonl(self._FILE_MAP["verifiers"])
-            self._verifiers = {}
-            for entry in entries:
-                scenario = entry.get("scenario")
-                task_idx = entry.get("task_idx")
-                if scenario is not None and task_idx is not None:
-                    self._verifiers.setdefault(scenario, {})[task_idx] = entry
-        return self._verifiers
+    def _get_data(self, key: str) -> dict:
+        """Lazily load and cache data for the given logical key."""
+        if key not in self._cache:
+            if key == "verifiers":
+                entries = self._read_jsonl(self._FILE_MAP[key])
+                index: dict[str, dict] = {}
+                for entry in entries:
+                    scenario = entry.get("scenario")
+                    task_idx = entry.get("task_idx")
+                    if scenario is not None and task_idx is not None:
+                        index.setdefault(scenario, {})[task_idx] = entry
+                self._cache[key] = index
+            elif key == "tasks":
+                raw = self._index_by_scenario(self._FILE_MAP[key])
+                self._cache[key] = {k: v.get("tasks", []) for k, v in raw.items()}
+            else:
+                self._cache[key] = self._index_by_scenario(self._FILE_MAP[key])
+        return self._cache[key]
 
     # ------------------------------------------------------------------
     # Public API
@@ -126,53 +109,53 @@ class AWMDataLoader:
 
     def list_scenarios(self) -> list[str]:
         """Return sorted list of all scenario names."""
-        return sorted(self._ensure_scenarios().keys())
+        return sorted(self._get_data("scenarios").keys())
 
     def get_scenario(self, scenario: str) -> dict:
         """Return the scenario description dict (``name``, ``description``)."""
-        data = self._ensure_scenarios()
+        data = self._get_data("scenarios")
         if scenario not in data:
             raise KeyError(f"Scenario '{scenario}' not found. Available: {sorted(data.keys())[:10]}...")
         return data[scenario]
 
     def get_tasks(self, scenario: str) -> list[str]:
         """Return the list of task strings for a scenario."""
-        data = self._ensure_tasks()
+        data = self._get_data("tasks")
         if scenario not in data:
             raise KeyError(f"No tasks found for scenario '{scenario}'")
         return data[scenario]
 
     def get_db_schema(self, scenario: str) -> dict:
         """Return the database schema dict with ``tables`` containing DDL and indexes."""
-        data = self._ensure_db_schemas()
+        data = self._get_data("db_schemas")
         if scenario not in data:
             raise KeyError(f"No DB schema found for scenario '{scenario}'")
         return data[scenario]["db_schema"]
 
     def get_sample_data(self, scenario: str) -> dict:
         """Return the sample data dict with INSERT statements per table."""
-        data = self._ensure_sample_data()
+        data = self._get_data("sample_data")
         if scenario not in data:
             raise KeyError(f"No sample data found for scenario '{scenario}'")
         return data[scenario]["sample_data"]
 
     def get_api_spec(self, scenario: str) -> dict:
         """Return the API specification dict with ``api_groups`` containing endpoints."""
-        data = self._ensure_api_specs()
+        data = self._get_data("api_specs")
         if scenario not in data:
             raise KeyError(f"No API spec found for scenario '{scenario}'")
         return data[scenario]["api_spec"]
 
     def get_env_code(self, scenario: str) -> str:
         """Return the full FastAPI implementation code string."""
-        data = self._ensure_env_codes()
+        data = self._get_data("env_codes")
         if scenario not in data:
             raise KeyError(f"No environment code found for scenario '{scenario}'")
         return data[scenario]["full_code"]
 
     def get_verifier(self, scenario: str, task_idx: int) -> str:
         """Return the verification function code string for a specific task."""
-        data = self._ensure_verifiers()
+        data = self._get_data("verifiers")
         if scenario not in data:
             raise KeyError(f"No verifiers found for scenario '{scenario}'")
         tasks = data[scenario]

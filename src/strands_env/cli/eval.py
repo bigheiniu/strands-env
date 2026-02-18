@@ -201,12 +201,12 @@ def list_cmd():
     default=False,
     help="Keep token-level observations in results.",
 )
-# Synthetic benchmark specific
+# Extra evaluator options (passed through as kwargs)
 @click.option(
     "--data-dir",
     type=click.Path(exists=True, path_type=Path),
     default=None,
-    help="Path to AWM-format data folder (required for 'synthetic' benchmark).",
+    help="Path to data folder (e.g., AWM-format for agent_world_model benchmark).",
 )
 @click.option(
     "--scenarios",
@@ -255,7 +255,7 @@ def run_cmd(
     output: Path,
     save_interval: int,
     keep_tokens: bool,
-    # Synthetic-specific
+    # Extra evaluator options
     data_dir: Path | None,
     scenarios: str | None,
     max_tasks_per_scenario: int | None,
@@ -290,10 +290,6 @@ def run_cmd(
     else:
         evaluator_cls = load_evaluator_hook(evaluator_path)
         benchmark_name = evaluator_cls.benchmark_name
-
-    # Validate synthetic-specific requirements
-    if benchmark_name == "synthetic" and data_dir is None:
-        raise click.ClickException("--data-dir is required for the 'synthetic' benchmark.")
 
     # Load hook file (validate before building model factory)
     env_factory_creator = load_env_hook(env_path)
@@ -355,7 +351,7 @@ def run_cmd(
         keep_tokens=eval_config.keep_tokens,
     )
 
-    # Pass synthetic-specific kwargs if provided
+    # Pass extra evaluator kwargs if provided
     if data_dir is not None:
         evaluator_kwargs["data_dir"] = data_dir
     if scenarios is not None:

@@ -9,7 +9,7 @@ import json
 import pytest
 
 from strands_env.core.types import Action, TerminationReason
-from strands_env.environments.synthetic_env.env import SyntheticEnv, SyntheticEnvConfig
+from strands_env.environments.agent_world_model.env import SyntheticEnv, SyntheticEnvConfig
 
 # ---------------------------------------------------------------------------
 # Test scenario data

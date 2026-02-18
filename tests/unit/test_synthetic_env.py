@@ -8,10 +8,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from strands_env.core.types import Action, Observation, StepResult, TaskContext, TerminationReason
-from strands_env.environments.synthetic_env.data_loader import AWMDataLoader
-from strands_env.environments.synthetic_env.db import copy_database, create_database
-from strands_env.environments.synthetic_env.env import SyntheticEnv, SyntheticEnvConfig
-from strands_env.environments.synthetic_env.reward import SyntheticEnvRewardFunction
+from strands_env.environments.agent_world_model.data_loader import AWMDataLoader
+from strands_env.environments.agent_world_model.db import copy_database, create_database
+from strands_env.environments.agent_world_model.env import SyntheticEnv, SyntheticEnvConfig
+from strands_env.environments.agent_world_model.reward import SyntheticEnvRewardFunction
 
 # ---------------------------------------------------------------------------
 # Test data fixtures
@@ -359,7 +359,7 @@ class TestDatabaseCreation:
 
 class TestToolGeneration:
     def test_create_api_tools(self, tmp_path):
-        from strands_env.environments.synthetic_env.tools import create_api_tools
+        from strands_env.environments.agent_world_model.tools import create_api_tools
 
         db_path = tmp_path / "test.db"
         create_database(db_path, SAMPLE_DB_SCHEMA["db_schema"], SAMPLE_DATA["sample_data"])
@@ -388,7 +388,7 @@ class TestToolGeneration:
             client.close()
 
     def test_tool_handler_list_users(self, tmp_path):
-        from strands_env.environments.synthetic_env.tools import create_api_tools
+        from strands_env.environments.agent_world_model.tools import create_api_tools
 
         db_path = tmp_path / "test.db"
         create_database(db_path, SAMPLE_DB_SCHEMA["db_schema"], SAMPLE_DATA["sample_data"])
@@ -411,7 +411,7 @@ class TestToolGeneration:
             client.close()
 
     def test_tool_handler_get_user(self, tmp_path):
-        from strands_env.environments.synthetic_env.tools import create_api_tools
+        from strands_env.environments.agent_world_model.tools import create_api_tools
 
         db_path = tmp_path / "test.db"
         create_database(db_path, SAMPLE_DB_SCHEMA["db_schema"], SAMPLE_DATA["sample_data"])
@@ -485,7 +485,7 @@ class TestVerifier:
 
 class TestSyntheticEnvConfig:
     def test_config_creation(self, data_dir):
-        from strands_env.environments.synthetic_env.env import SyntheticEnvConfig
+        from strands_env.environments.agent_world_model.env import SyntheticEnvConfig
 
         config = SyntheticEnvConfig(
             scenario=SCENARIO_NAME,

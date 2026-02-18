@@ -1,7 +1,21 @@
+# Copyright 2025 Horizon RL Contributors
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Environment hook file for the synthetic benchmark.
 
 Usage:
-    strands-env eval run synthetic --env src/strands_env/environments/synthetic_env/env_hook.py --data-dir /path/to/AWM-1K
+    strands-env eval run synthetic --env examples/eval/agent_world_model/env_hook.py --data-dir /path/to/AWM-1K
 """
 
 from __future__ import annotations
@@ -10,7 +24,7 @@ from pathlib import Path
 
 from strands_env.cli.config import EnvConfig
 from strands_env.core.models import ModelFactory
-from strands_env.environments.synthetic_env import SyntheticEnv, SyntheticEnvConfig
+from strands_env.environments.agent_world_model import SyntheticEnv, SyntheticEnvConfig
 
 
 def create_env_factory(model_factory: ModelFactory, env_config: EnvConfig):

@@ -23,7 +23,7 @@ from pathlib import Path
 from typing_extensions import override
 
 from strands_env.core import Action, TaskContext
-from strands_env.environments.synthetic_env.data_loader import AWMDataLoader
+from strands_env.environments.agent_world_model.data_loader import AWMDataLoader
 
 from ..evaluator import AsyncEnvFactory, Evaluator
 from ..registry import register_eval
