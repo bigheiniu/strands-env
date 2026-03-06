@@ -28,9 +28,6 @@ from strands_env.utils.aws import get_session
 #: Default judge model for grading answers.
 JUDGE_MODEL_ID = os.getenv("JUDGE_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 
-SYSTEM_PROMPT = """You are a helpful assistant. Answer the question based on your knowledge. \
-Be concise and provide the most accurate answer possible."""
-
 
 def create_env_factory(model_factory: ModelFactory, env_config: EnvConfig):
     """Create env_factory for chat-only FRAMES evaluation.
@@ -54,7 +51,7 @@ def create_env_factory(model_factory: ModelFactory, env_config: EnvConfig):
         return Environment(
             model_factory=model_factory,
             reward_fn=reward_fn,
-            system_prompt=env_config.system_prompt or SYSTEM_PROMPT,
+            system_prompt=env_config.system_prompt,
             verbose=env_config.verbose,
         )
 
