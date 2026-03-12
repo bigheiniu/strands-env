@@ -10,7 +10,7 @@ This guide covers integrating `strands-env` with RL training frameworks, specifi
 - `rollout_logprobs` - Log probabilities for each generated token
 - `rollout_loss_mask` - Mask for loss computation
 
-## Slime Integration
+## slime Integration
 
 Customize the `generate` and `reward_func` methods to replace single generation with agentic rollout:
 
