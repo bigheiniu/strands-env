@@ -35,6 +35,7 @@ from strands_env.rewards.math_verify_reward import MathVerifyReward
 from strands_env.utils.aws import get_client
 from strands_env.utils.slime import RolloutLogger
 
+# export for slime's --custom-rollout-log-function-path
 log_rollout_metrics = RolloutLogger(n_rollouts_per_step=3, log_per_tool_metrics=False).log_rollouts
 
 logger = logging.getLogger(__name__)
@@ -103,8 +104,8 @@ async def generate_and_rm(args, sample: Sample, sampling_params) -> Sample:
     else:
         sample.status = Sample.Status.TRUNCATED
 
-    # Set metrics for custom rollout logging
-    sample.metrics = step_result.observation.metrics
+    # Set step result for custom rollout logging in `log_rollout_metrics`
+    sample.step_result = step_result
 
     await env.cleanup()
 
@@ -114,13 +115,4 @@ async def generate_and_rm(args, sample: Sample, sampling_params) -> Sample:
     else:
         sample.reward = step_result.reward.reward
 
-    logger.info(
-        "reward=%.2f | status=%s | tool_iters=%s | tool_calls=%s | tokens=%s | resp_len=%s",
-        sample.reward,
-        sample.status.name,
-        sample.metrics.get("tool_iters", 0),
-        sample.metrics.get("tool_calls", 0),
-        len(sample.tokens),
-        sample.response_length,
-    )
     return sample
