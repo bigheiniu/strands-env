@@ -43,12 +43,13 @@ class RolloutLogger:
     Set to 0 to disable.
     """
 
-    def __init__(self, n_rollouts_per_step: int = 3) -> None:
+    def __init__(self, n_rollouts_per_step: int = 3, log_per_tool_metrics: bool = False) -> None:
         """Initialize a `RolloutLogger` instance."""
         self._weave_init = False
         self.dataset: weave.Dataset | None = None
         self.run_name: str | None = None
         self.n_rollouts_per_step = n_rollouts_per_step
+        self.log_per_tool_metrics = log_per_tool_metrics
 
     def log_rollouts(
         self,
@@ -73,8 +74,7 @@ class RolloutLogger:
 
         return False
 
-    @staticmethod
-    def log_rollout_metrics(samples: list[Sample], rollout_extra_metrics: dict | None) -> None:
+    def log_rollout_metrics(self, samples: list[Sample], rollout_extra_metrics: dict | None) -> None:
         """Aggregate `StepResult.observation.metrics` across samples.
 
         Note:
@@ -83,12 +83,24 @@ class RolloutLogger:
         """
         per_sample: dict[str, list[float]] = {
             "message_count": [],
-            "tool_iters": [],
             "model_calls": [],
             "model_latency_s": [],
             "cache_hit_rate": [],
+            "tool_iters": [],
+            "tool_calls": [],
+            "executed_tool_calls": [],
+            "cancelled_tool_calls": [],
+            "tool_latency_s": [],
         }
 
+        aggregated: dict[str, float] = {
+            "tool_name_error_rate": 0.0,
+            "tool_success_rate": 0.0,
+            "tool_parse_error_rate": 0.0,
+            "tool_latency_s": 0.0,
+        }
+
+        total_executed_tool_calls = 0
         for sample in samples:
             metrics: dict[str, Any] = sample.step_result.observation.metrics
             if not metrics:
@@ -96,22 +108,38 @@ class RolloutLogger:
 
             per_sample["message_count"].append(metrics.get("message_count", 0))
             per_sample["tool_iters"].append(metrics.get("tool_iters", 0))
+            per_sample["tool_calls"].append(metrics.get("tool_calls", 0))
+            per_sample["cancelled_tool_calls"].append(metrics.get("cancelled_tool_calls", 0))
             per_sample["model_calls"].append(metrics.get("model_calls", 0))
             latency = metrics.get("model_latency_s")
             per_sample["model_latency_s"].append(latency["total"] if latency else 0)
             per_sample["cache_hit_rate"].append(metrics.get("cache_hit_rate") or 0)
 
+            executed_tool_calls = 0
+            tool_latency_s = 0.0
             for tool_name, tm in (metrics.get("per_tool_metrics") or {}).items():
                 key = f"{tool_name}_tool"
                 calls = tm["calls"]
-                per_sample.setdefault(f"{key}_calls", []).append(calls)
-                per_sample.setdefault(f"{key}_latency_s", []).append(tm["latency_s"])
-                per_sample.setdefault(f"{key}_success_rate", []).append(tm["successes"] / calls)
-                per_sample.setdefault(f"{key}_parse_error_rate", []).append(tm.get("parse_errors", 0) / calls)
+                if tm["is_known"]:
+                    if self.log_per_tool_metrics:
+                        per_sample.setdefault(f"{key}_calls", []).append(calls)
+                        per_sample.setdefault(f"{key}_latency_s", []).append(tm["latency_s"])
+                        per_sample.setdefault(f"{key}_success_rate", []).append(tm["successes"] / calls)
+                        per_sample.setdefault(f"{key}_parse_error_rate", []).append(tm.get("parse_errors", 0) / calls)
+                else:
+                    aggregated["tool_name_error_rate"] += calls
+                executed_tool_calls += calls
+                aggregated["tool_success_rate"] += tm["successes"]
+                aggregated["tool_parse_error_rate"] += tm.get("parse_errors", 0)
+                tool_latency_s += tm["latency_s"]
+            total_executed_tool_calls += executed_tool_calls
+            per_sample["tool_latency_s"].append(tool_latency_s / executed_tool_calls if executed_tool_calls else 0)
 
         log_dict: dict[str, float] = {}
         for name, values in per_sample.items():
             log_dict |= {f"{name}_{k}": v for k, v in compute_statistics(values).items()}
+        for name, value in aggregated.items():
+            log_dict[f"{name}"] = value / total_executed_tool_calls if total_executed_tool_calls else 0
         log_dict = dict_add_prefix(log_dict, "rollout/")
         if rollout_extra_metrics is not None:
             rollout_extra_metrics.update(log_dict)
