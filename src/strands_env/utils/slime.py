@@ -187,7 +187,7 @@ class RolloutLogger:
             return
 
         if self.dataset is None:
-            self.dataset = weave.Dataset(name=f"{self.run_name}_rollouts", rows=rows)
+            self.dataset = weave.Dataset(name=f"{self.run_name}_rollouts", rows=weave.Table(rows=rows))
             weave.publish(self.dataset)
         else:
             self.dataset = self.dataset.add_rows(rows)
