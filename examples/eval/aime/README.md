@@ -16,6 +16,7 @@ Requires AWS credentials with Bedrock AgentCore access.
 
 ## Files
 
+- `chat_env.py` - Chat-only (no tools) — tests pure parametric knowledge
 - `code_sandbox_env.py` - Environment hook using `CodeSandboxEnv` with Python execution
 
 ## Usage
