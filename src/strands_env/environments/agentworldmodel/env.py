@@ -19,14 +19,14 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import random
 import shutil
+import subprocess
 from datetime import timedelta
-from multiprocessing.process import BaseProcess
 from pathlib import Path
 from typing import Any, Literal
 
 import httpx
-from awm.tools import get_random_available_port
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.types import TextContent
@@ -40,20 +40,24 @@ from strands_env.core.types import RewardFunction
 from strands_env.tools.mcp_tool import MCPToolAdapter
 
 from .reward import AgentWorldModelRewardFunction
-from .server import start_server, stop_server, write_server_script
+from .server import kill_server, start_server
 
 logger = logging.getLogger(__name__)
 
 
 class AgentWorldModelMCPTool(MCPToolAdapter):
-    """MCP tool that checks server health before each call."""
+    """MCP tool backed by a `ClientSession` (single-server, direct connection).
+
+    If `server_proc` is provided, polls the process before each call
+    to fail fast when the server has exited.
+    """
 
     def __init__(
         self,
         mcp_tool: MCPToolDef,
         session: ClientSession,
         *,
-        server_proc: BaseProcess | None = None,
+        server_proc: subprocess.Popen | None = None,
         timeout: timedelta | None = None,
     ):
         """Initialize an `AgentWorldModelMCPTool` instance."""
@@ -65,9 +69,11 @@ class AgentWorldModelMCPTool(MCPToolAdapter):
     async def call_tool(
         self, name: str, args: dict[str, Any]
     ) -> tuple[list[ToolResultContent], Literal["success", "error"]]:
-        """Execute tool via MCP session, failing fast if server has exited."""
-        if self._server_proc is not None and not self._server_proc.is_alive():
-            raise RuntimeError(f"Server process exited with code {self._server_proc.exitcode}")
+        """Execute tool via MCP session, failing fast if server process has exited."""
+        if self._server_proc is not None:
+            returncode = self._server_proc.poll()
+            if returncode is not None:
+                raise RuntimeError(f"Server process exited with code {returncode}")
         result = await self._session.call_tool(name, args, self._timeout)
         content = [ToolResultContent(text=item.text) for item in result.content if isinstance(item, TextContent)]
         status: Literal["success", "error"] = "error" if result.isError else "success"
@@ -86,10 +92,13 @@ class AgentWorldModelConfig(EnvironmentConfig):
 
 
 class AgentWorldModelEnvironment(Environment):
-    """MCP environment backed by an AgentWorldModel FastAPI server.
+    """MCP environment backed by an AgentWorldModel FastAPI server subprocess.
 
-    Uses ``mp.Process`` for server lifecycle: pipe-based readiness,
-    graceful shutdown via SIGTERM.
+    Notes:
+        - `reset()` starts a per-task FastAPI server, opens an MCP session,
+          and discovers tools.
+        - `cleanup()` closes the session, kills the server, and removes the
+          temp directory.
     """
 
     default_system_prompt_path = Path(__file__).parent / "system_prompt.md"
@@ -109,32 +118,34 @@ class AgentWorldModelEnvironment(Environment):
             **config,  # type: ignore[misc]
         )
         self._http_client = http_client
-        self._tool_call_timeout = timedelta(seconds=self.config.get("tool_call_timeout", 60))
-        self._server_proc: BaseProcess | None = None
+        self._tool_call_timeout = timedelta(seconds=int(self.config.get("tool_call_timeout", 60)))
+        self._scenario: str = str(self.config["scenario"])
+        self._envs_path = Path(str(self.config["envs_path"]))
+        self._work_db_path = Path(str(self.config["work_db_path"]))
+        self._initial_db_path = Path(str(self.config["initial_db_path"]))
+        self._temp_dir = Path(str(self.config["temp_dir"]))
+        self._server_proc: subprocess.Popen | None = None
         self._exit_stack: contextlib.AsyncExitStack | None = None
         self._tools: list[AgentWorldModelMCPTool] = []
 
     @override
     async def reset(self) -> None:
-        """Start server, open MCP session, discover tools."""
-        port = get_random_available_port()
-        script = Path(self.config["temp_dir"]) / "server.py"
-        await asyncio.to_thread(
-            write_server_script,
-            script,
-            self.config["scenario"],
-            Path(self.config["envs_path"]),
-            Path(self.config["work_db_path"]),
+        """Start AgentWorldModel server, open MCP session, discover tools."""
+        await asyncio.sleep(random.uniform(0, 5))  # stagger concurrent server spawns
+        self._server_proc, port = await start_server(
+            self._scenario,
+            self._envs_path,
+            self._work_db_path,
+            self._temp_dir,
         )
-        self._server_proc = await asyncio.to_thread(start_server, script, port)
-        logger.info("Server pid=%d for %s on port %d", self._server_proc.pid, self.config["scenario"], port)
 
+        # Open MCP session and discover tools
         stack = contextlib.AsyncExitStack()
         try:
             transport = streamable_http_client(
                 f"http://localhost:{port}/mcp",
                 http_client=self._http_client,
-                terminate_on_close=False,  # we stop the server ourselves
+                terminate_on_close=False,  # we kill the server ourselves in cleanup()
             )
             read_stream, write_stream, *_ = await stack.enter_async_context(transport)
             session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
@@ -142,7 +153,12 @@ class AgentWorldModelEnvironment(Environment):
 
             result = await session.list_tools()
             self._tools = [
-                AgentWorldModelMCPTool(tool, session, server_proc=self._server_proc, timeout=self._tool_call_timeout)
+                AgentWorldModelMCPTool(
+                    tool,
+                    session,
+                    server_proc=self._server_proc,
+                    timeout=self._tool_call_timeout,
+                )
                 for tool in result.tools
             ]
             logger.info("Listed %d MCP tools", len(self._tools))
@@ -154,19 +170,18 @@ class AgentWorldModelEnvironment(Environment):
 
     @override
     def get_tools(self) -> list:
-        """Return the MCP tools discovered during ``reset()``."""
+        """Return the MCP tools discovered during `reset()`."""
         return list(self._tools)
 
     @override
     async def cleanup(self) -> None:
-        """Close MCP session, stop server, remove temp dir."""
+        """Close MCP session/transport, kill server, remove temp dir."""
         self._tools = []
         if self._exit_stack:
             with contextlib.suppress(Exception):
                 await self._exit_stack.aclose()
             self._exit_stack = None
-        await asyncio.to_thread(stop_server, self._server_proc)
+        await kill_server(self._server_proc)
         self._server_proc = None
-        temp_dir = self.config.get("temp_dir")
-        if temp_dir:
-            await asyncio.to_thread(shutil.rmtree, temp_dir, True)
+        if self._temp_dir:
+            await asyncio.to_thread(shutil.rmtree, self._temp_dir, True)
