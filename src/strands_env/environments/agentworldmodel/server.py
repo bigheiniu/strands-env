@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""AgentWorldModel server lifecycle using multiprocessing.
-
-The script defines the app; this module controls how it runs.
-Pipe-based readiness, graceful shutdown via SIGTERM.
-"""
+"""AgentWorldModel server script generation and lifecycle utilities."""
 
 from __future__ import annotations
 
@@ -24,23 +20,37 @@ import asyncio
 import contextlib
 import json
 import logging
-import multiprocessing as mp
+import os
 import signal
-from multiprocessing.connection import Connection
-from multiprocessing.process import BaseProcess
+import socket
+import subprocess
+import sys
+import time
 from pathlib import Path
 
-from awm.tools import normalize_scenario_name
+from awm.tools import get_random_available_port, normalize_scenario_name
 
 logger = logging.getLogger(__name__)
 
+_MCP_INJECT = """\
+    from fastapi_mcp import FastApiMCP
+    mcp = FastApiMCP(app)
+    mcp.mount_http()"""
 SERVER_STARTUP_TIMEOUT = 30
 
-_mp_context = mp.get_context("spawn")
 
+def write_server_script(
+    script_path: Path,
+    port: int,
+    scenario: str,
+    envs_path: Path,
+    work_db_path: Path,
+) -> None:
+    """Generate a runnable FastAPI server script from gen_envs.jsonl.
 
-def write_server_script(script_path: Path, scenario: str, envs_path: Path, work_db_path: Path) -> None:
-    """Generate an app-only script (no uvicorn, no ``__main__``)."""
+    Same transformation as `awm.core.server.run_server()` but writes a
+    self-contained script — no `os.system()`, no intermediate processes.
+    """
     normalized = normalize_scenario_name(scenario)
     with open(envs_path) as f:
         for line in f:
@@ -50,85 +60,72 @@ def write_server_script(script_path: Path, scenario: str, envs_path: Path, work_
         else:
             raise ValueError(f"Scenario {normalized} not found in {envs_path}")
 
-    lines: list[str] = [
-        "import warnings",
-        'warnings.filterwarnings("ignore", category=DeprecationWarning)',
-    ]
-    for src in entry["full_code"].split("\n"):
-        if src.strip().startswith("if __name__"):
-            break
-        if "create_engine(" in src:
-            left = src.split("create_engine(")[0]
-            src = f"{left}create_engine('sqlite:///{work_db_path}', connect_args={{'check_same_thread': False}})"
-        lines.append(src)
+    new_lines = ["import warnings", 'warnings.filterwarnings("ignore", category=DeprecationWarning)']
+    for src_line in entry["full_code"].split("\n"):
+        if "create_engine(" in src_line:
+            left = src_line.split("create_engine(")[0]
+            src_line = f"{left}create_engine('sqlite:///{work_db_path}', connect_args={{'check_same_thread': False}})"
+        if "uvicorn.run(app" in src_line:
+            new_lines.append(_MCP_INJECT)
+            src_line = f"    uvicorn.run(app, host='127.0.0.1', port={port})"
+        new_lines.append(src_line)
 
-    lines.append("")
-    lines.append("from fastapi_mcp import FastApiMCP")
-    lines.append("FastApiMCP(app).mount_http()")
-
-    script_path.write_text("\n".join(lines))
+    script_path.write_text("\n".join(new_lines))
 
 
-def _run_server(script: str, port: int, pipe: Connection) -> None:
-    """Child process: exec script to get ``app``, run uvicorn, signal readiness."""
-    signal.signal(signal.SIGINT, signal.SIG_IGN)  # KeyboardInterrupt handled by stop_server(), not here
-    try:
-        import sys
-
-        import uvicorn
-
-        # exec into __main__ so Pydantic can resolve forward references in FastAPI models
-        exec(compile(Path(script).read_text(), script, "exec"), vars(sys.modules["__main__"]))  # noqa: S102
-        app = sys.modules["__main__"].app  # type: ignore[attr-defined]
-
-        config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
-        config.load()
-        server = uvicorn.Server(config)
-        server.lifespan = config.lifespan_class(config)
-
-        async def _serve() -> None:
-            await server.startup()  # bind socket, start accepting connections
-            pipe.send(True)  # signal parent: server is ready
-            pipe.close()  # done with pipe, release fd
-            await server.main_loop()  # serve requests until SIGTERM
-            await server.shutdown()  # close connections, clean up
-
-        asyncio.run(_serve())
-    except Exception as exc:
-        with contextlib.suppress(Exception):
-            # Send as RuntimeError — original exception may not be picklable (e.g. Pydantic errors)
-            pipe.send(RuntimeError(f"{type(exc).__name__}: {exc}"))
-            pipe.close()
+def _wait_for_server_sync(port: int, scenario: str) -> None:
+    """Block until the server accepts TCP connections (sync, runs in thread)."""
+    deadline = time.monotonic() + SERVER_STARTUP_TIMEOUT
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1):
+                return
+        except (ConnectionRefusedError, OSError):
+            time.sleep(0.3)
+    raise TimeoutError(f"AgentWorldModel server for {scenario} did not start within {SERVER_STARTUP_TIMEOUT}s")
 
 
-def start_server(script: Path, port: int, timeout: float = SERVER_STARTUP_TIMEOUT) -> BaseProcess:
-    """Start server in a child process. Blocks until uvicorn is accepting connections."""
-    parent, child = _mp_context.Pipe(duplex=False)
-    proc = _mp_context.Process(target=_run_server, args=(str(script), port, child), daemon=True)
-    proc.start()
-    child.close()
-    try:
-        if not parent.poll(timeout):
-            raise TimeoutError(f"Server did not start within {timeout}s")
-        result = parent.recv()
-        if isinstance(result, Exception):
-            raise result
-    except BaseException:
-        stop_server(proc)
-        raise
-    finally:
-        parent.close()
-    return proc
+async def wait_for_server(port: int, scenario: str) -> None:
+    """Async wrapper — runs sync poll in a thread to keep fds off the event loop."""
+    await asyncio.to_thread(_wait_for_server_sync, port, scenario)
 
 
-def stop_server(proc: BaseProcess | None, timeout: float = 5) -> None:
-    """SIGTERM → join → SIGKILL → close."""
-    if proc is None:
+async def start_server(
+    scenario: str,
+    envs_path: Path,
+    work_db_path: Path,
+    temp_dir: Path,
+) -> tuple[subprocess.Popen, int]:
+    """Generate server script, start subprocess, wait for TCP readiness.
+
+    Returns:
+        A tuple of (server process, port).
+    """
+    port = get_random_available_port()
+    script = temp_dir / "server.py"
+    await asyncio.to_thread(write_server_script, script, port, scenario, envs_path, work_db_path)
+
+    proc = subprocess.Popen(
+        [sys.executable, str(script)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    await wait_for_server(port, scenario)
+    logger.info("AgentWorldModel server pid=%d for %s on port %d", proc.pid, scenario, port)
+    return proc, port
+
+
+async def kill_server(proc: subprocess.Popen | None, timeout: float = 5) -> None:
+    """Graceful shutdown: SIGTERM first, then SIGKILL if needed."""
+    if proc is None or proc.poll() is not None:
         return
-    if proc.is_alive():
-        proc.terminate()
-        proc.join(timeout=timeout)
-    if proc.is_alive():
-        proc.kill()
-        proc.join(timeout=2)
-    proc.close()
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    try:
+        await asyncio.to_thread(proc.wait, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        with contextlib.suppress(Exception):
+            await asyncio.to_thread(proc.wait, timeout=2)
