@@ -196,7 +196,7 @@ def run_cmd(
     model_config = ModelConfig(
         backend=backend,
         base_url=base_url,
-        model_id=model_id or ModelConfig.model_id,
+        model_id=model_id,
         tokenizer_path=tokenizer_path,
         tool_parser=tool_parser,
         region=region or ModelConfig.region,

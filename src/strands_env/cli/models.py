@@ -58,8 +58,8 @@ class ModelConfig:
     tokenizer_path: str | None = None  # Auto-detected if None
     tool_parser: str | None = None  # Parser name or path to hook file
 
-    # Bedrock
-    model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+    # Bedrock / model identifier (auto-detected for SGLang; defaults to Claude Sonnet for Bedrock)
+    model_id: str | None = None
     region: str = "us-west-2"
     profile_name: str | None = None  # AWS profile name
     role_arn: str | None = None  # For role assumption
@@ -87,8 +87,8 @@ def build_model_factory(config: ModelConfig, max_concurrency: int) -> ModelFacto
         case "sglang":
             check_server_health(config.base_url)
             client = get_client(config.base_url, max_connections=max_concurrency)
-            config.model_id = get_model_id(config.base_url) if not config.model_id else config.model_id
-            config.tokenizer_path = config.model_id if not config.tokenizer_path else config.tokenizer_path
+            config.model_id = config.model_id or get_model_id(config.base_url)
+            config.tokenizer_path = config.tokenizer_path or config.model_id
             return sglang_model_factory(
                 client=client,
                 tokenizer=get_tokenizer(config.tokenizer_path),
@@ -96,6 +96,7 @@ def build_model_factory(config: ModelConfig, max_concurrency: int) -> ModelFacto
                 sampling_params=sampling,
             )
         case "bedrock":
+            config.model_id = config.model_id or "us.anthropic.claude-sonnet-4-20250514-v1:0"
             boto_session = get_session(
                 region=config.region or "us-east-1",
                 profile_name=config.profile_name,
