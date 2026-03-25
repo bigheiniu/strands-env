@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import random
 import shutil
@@ -74,6 +75,20 @@ class AgentWorldModelMCPTool(MCPToolAdapter):
             returncode = self._server_proc.poll()
             if returncode is not None:
                 raise RuntimeError(f"Server process exited with code {returncode}")
+        # Coerce string values to schema-declared types (XML parsers extract everything as strings)
+        properties = self._mcp_tool.inputSchema.get("properties", {})
+        for key, value in args.items():
+            if isinstance(value, str) and properties.get(key, {}).get("type") in (
+                "array",
+                "object",
+                "integer",
+                "number",
+                "boolean",
+            ):
+                try:
+                    args[key] = json.loads(value)
+                except (json.JSONDecodeError, ValueError):
+                    pass
         result = await self._session.call_tool(name, args, self._timeout)
         content = [ToolResultContent(text=item.text) for item in result.content if isinstance(item, TextContent)]
         status: Literal["success", "error"] = "error" if result.isError else "success"
