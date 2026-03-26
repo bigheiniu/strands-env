@@ -64,14 +64,6 @@ class MCPAtlasTaskContext(TaskContext):
     gtfa_claims: list[str]
 
 
-def _server_from_tool(tool_name: str) -> str:
-    """Extract server name from a prefixed tool name.
-
-    Example: `"filesystem_read_text_file"` → `"filesystem"`.
-    """
-    return tool_name.split("_", 1)[0]
-
-
 @register_eval("mcp-atlas")
 class MCPAtlasEvaluator(Evaluator):
     """Evaluator for MCP-Atlas benchmark."""
@@ -118,7 +110,7 @@ class MCPAtlasEvaluator(Evaluator):
             enabled_tools_raw = json.loads(row["ENABLED_TOOLS"])
             enabled_tools = [tool["name"] if isinstance(tool, dict) else tool for tool in enabled_tools_raw]
             if self._available_servers is not None:
-                tool_servers = {_server_from_tool(tool) for tool in enabled_tools if "_" in tool}
+                tool_servers = {tool_name.split("_", 1)[0] for tool_name in enabled_tools if "_" in tool_name}
                 if tool_servers and not tool_servers.issubset(self._available_servers):
                     skipped += 1
                     continue
