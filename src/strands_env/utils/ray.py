@@ -49,7 +49,7 @@ class EnvironmentActor:
         args_dict: dict[str, Any],
         sampling_params: dict[str, Any],
     ) -> None:
-        """Initialize an ``EnvironmentActor`` instance."""
+        """Initialize an `EnvironmentActor` instance."""
         env_hook = load_function(env_hook_path)
         args = Namespace(**args_dict)
         self.env_factory = env_hook(args, sampling_params)
@@ -94,7 +94,7 @@ class EnvironmentActorPool:
         sampling_params: dict[str, Any],
         num_actors_per_node: int,
     ) -> None:
-        """Initialize an ``EnvironmentActorPool`` instance."""
+        """Initialize an `EnvironmentActorPool` instance."""
         nodes = [n for n in ray.nodes() if n.get("Alive")]
         if not nodes:
             raise RuntimeError("No alive Ray nodes for EnvironmentActor placement.")
@@ -127,7 +127,7 @@ class EnvironmentActorPool:
     async def step(self, action: Action) -> StepResult:
         """Run one environment step on the next available actor.
 
-        Uses ``asyncio.to_thread(ray.get, ...)`` to avoid blocking the
+        Uses `asyncio.to_thread(ray.get, ...)` to avoid blocking the
         caller's event loop.
         """
         actor = next(self.cycle)
