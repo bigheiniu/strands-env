@@ -22,7 +22,6 @@ parsing.
 
 from __future__ import annotations
 
-import asyncio
 from datetime import timedelta
 from typing import Any, Literal
 
@@ -92,9 +91,6 @@ class MCPToolAdapter(AgentTool):
         """Stream a tool result back to the agent."""
         try:
             content, status = await self.call_tool(self._mcp_tool.name, tool_use["input"])
-        except asyncio.CancelledError:
-            content = [ToolResultContent(text="Tool call cancelled")]
-            status = "error"
         except Exception as e:
             content = [ToolResultContent(text=f"Tool call failed: {type(e).__name__}: {e}")]
             status = "error"

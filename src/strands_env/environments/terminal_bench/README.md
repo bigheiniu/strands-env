@@ -7,7 +7,7 @@ An environment for [Terminal-Bench](https://github.com/terminal-bench/terminal-b
 | Backend | Description | Install |
 |---|---|---|
 | `"docker"` (default) | Local Docker via Harbor's `DockerEnvironment` | `pip install strands-env[terminal-bench]` |
-| `"eks"` | AWS EKS/Fargate via [harbor-aws](https://github.com/JackXu0/harbor-aws) | `pip install harbor-aws` |
+| `"eks"` | AWS EKS/Fargate via [harbor-aws](https://github.com/JackXu0/harbor-aws) | `pip install strands-env[terminal-bench]` |
 
 ## Setup
 

@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example environment hook for SimpleQA-Verified evaluation with a chat-only environment (no tools)."""
+"""Example environment hook for SealQA evaluation with a chat-only environment (no tools)."""
 
 from strands_env.core import Environment
 from strands_env.core.models import bedrock_model_factory, build_model_factory
-from strands_env.eval.benchmarks.simpleqa_verified import SimpleQAReward
+from strands_env.eval.benchmarks.sealqa import SealQAReward
 from strands_env.utils.aws import get_session
 
 
 def create_env_factory(model_config: dict, **env_config):
-    """Create env_factory for chat-only SimpleQA-Verified evaluation."""
+    """Create env_factory for chat-only SealQA evaluation."""
     model_factory = build_model_factory(model_config)
     judge_models = []
     for profile_name in env_config.get("judge_model_profiles", [None]):
@@ -33,7 +33,7 @@ def create_env_factory(model_config: dict, **env_config):
                 sampling_params={"max_new_tokens": 1024},
             )()
         )
-    reward_fn = SimpleQAReward(judge_model=judge_models, max_model_retries=env_config.get("max_judge_retries", 3))
+    reward_fn = SealQAReward(judge_model=judge_models, max_model_retries=env_config.get("max_judge_retries", 3))
 
     async def env_factory(_action):
         return Environment(model_factory=model_factory, reward_fn=reward_fn, **env_config)
