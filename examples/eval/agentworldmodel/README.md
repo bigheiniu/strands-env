@@ -20,34 +20,38 @@
 
 ```bash
 #/home/lyichuan/agent-world-model/outputs/all1000
-#
-AWM_DATA_DIR=~/path/to/outputs/all1000/part_1 \
+#/Users/lyichuan/PycharmProjects/AutoEnvCreate/output/new_5part
+AWM_DATA_DIR=/Users/lyichuan/PycharmProjects/AutoEnvCreate/output/new_5part \
 strands-env eval run \
     --evaluator examples.eval.agentworldmodel.awm_evaluator \
     --env examples.eval.agentworldmodel.awm_env \
     --backend sglang \
     --base-url http://localhost:30000 \
     --max-tokens 16384 \
-    --n-samples-per-prompt 3 \
+    --n-samples-per-prompt 4 \
     --max-concurrency 10 \
-    --max-tool-iters 15
+    --max-tool-iters 20
 ```
 
 
 ```bash
-                                                                                                                                                                                          
-
-    AWM_DATA_DIR=/home/lyichuan/agent-world-model/outputs/all1000 \
+                                                                                                                                                                                        
+                                                                                                                                                                                        models 
+                                                                                                                                                                                      global.qwen.qwen3-235b-a22b-2507-v1:0
+global.moonshotai.kimi-k2.5                                                                                                                                                                                        
+for i in seq(1..5); do 
+    AWM_DATA_DIR=/local/home/lyichuan/awm_data/new_5part_04012026/part_${i} \
     strands-env eval run \
         --evaluator examples.eval.agentworldmodel.awm_evaluator \
         --env examples.eval.agentworldmodel.awm_env \
         --backend bedrock \
-        --model-id us.anthropic.claude-sonnet-4-5-20250929-v1:0 \
-        --max-tokens 30000 \
-        --n-samples-per-prompt 8 \
+        --model-id global.anthropic.claude-sonnet-4-5-20250929-v1:0 \
+        --max-tokens 65000 \
+        --n-samples-per-prompt 2 \
         --max-concurrency 10 \
-        --env-config '{"max_tool_iters": 15, "max_tool_calls": 30}' \
-        -o awm_eval_sonnet
+        --env-config '{"max_tool_iters": 20, "max_tool_calls": 30}' \
+        -o awm_eval_sonnet_v2/part_${i} $
+        
 ```
 
  Key parameters:

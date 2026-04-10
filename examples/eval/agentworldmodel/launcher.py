@@ -188,6 +188,8 @@ def parse_args() -> argparse.Namespace:
                         ] + list(M5_INITIATIVE_ID_SET),
                         help="Greenland initiative ID (default: SFAI-shared-p5)")
     parser.add_argument("--is-production", action="store_true")
+    parser.add_argument("--resume-from", default=None,
+                        help="S3 path to previous results dir to resume from (copies results.jsonl before starting)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print commands without submitting job")
 
@@ -217,6 +219,11 @@ def create_job_name(args: argparse.Namespace) -> str:
     suffix = "".join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
     sanitized = re.sub(r'[^a-zA-Z0-9_-]', '-', args.job_name)
     return f"{sanitized}_{suffix}"
+
+
+def create_output_dir_name(args: argparse.Namespace) -> str:
+    """Deterministic output directory name (no random suffix) for checkpoint resume."""
+    return re.sub(r'[^a-zA-Z0-9_-]', '-', args.job_name)
 
 
 def compress_items(source_items, output_filename):
@@ -337,13 +344,18 @@ def build_s3_sync_commands(run_cmd: str, results_dir: str, output_path: str, syn
     results_dirname = os.path.basename(os.path.normpath(results_dir))
     s3_dest = f"{output_path.rstrip('/')}/{results_dirname}/"
     # Copy server log into results dir so it gets synced to S3
-    copy_server_log = f"cp {WORKDIR}/sglang_server.log {results_dir} 2>/dev/null"
-    s3_cp = f"{copy_server_log} ; aws s3 cp {results_dir} {s3_dest} --recursive --region us-east-1"
+    copy_logs = (
+        f"cp {WORKDIR}/sglang_server.log {results_dir} 2>/dev/null ; "
+        f"cp {WORKDIR}/eval.log {results_dir} 2>/dev/null"
+    )
+    s3_cp = f"{copy_logs} ; aws s3 cp {results_dir} {s3_dest} --recursive --region us-east-1"
+    # Tee eval stdout/stderr to a log file for debugging
+    logged_run_cmd = f"{run_cmd} 2>&1 | tee {WORKDIR}/eval.log"
     if sync_interval <= 0:
-        return f"{run_cmd} ; {s3_cp}"
+        return f"{logged_run_cmd} ; {s3_cp}"
     return (
         f"(while true; do sleep {sync_interval}; {s3_cp}; done & _SYNC_PID=$! ; "
-        f"{run_cmd} ; "
+        f"{logged_run_cmd} ; "
         f"kill $_SYNC_PID 2>/dev/null ; "
         f"{s3_cp})"
     )
@@ -353,11 +365,11 @@ def build_s3_sync_commands(run_cmd: str, results_dir: str, output_path: str, syn
 # AWM eval command builder
 # =========================================================================
 
-def build_awm_eval_cmd(args: argparse.Namespace, job_name: str) -> str:
+def build_awm_eval_cmd(args: argparse.Namespace, output_dir_name: str) -> str:
     """Build the strands-env eval run command for AWM benchmark."""
     awm_workdir = WORKDIR
     awm_data_dir = f"{WORKDIR}/awm_data"
-    results_dir = f"{awm_workdir}/{job_name}/"
+    results_dir = f"{awm_workdir}/{output_dir_name}/"
     cmd_parts = []
 
     # 1. Download AWM dataset from S3
@@ -370,10 +382,11 @@ def build_awm_eval_cmd(args: argparse.Namespace, job_name: str) -> str:
     # The evaluator auto-resumes from results.jsonl if it exists.
     results_dirname = os.path.basename(os.path.normpath(results_dir))
     s3_results = f"{args.output_path.rstrip('/')}/{results_dirname}/"
+    resume_source = args.resume_from.rstrip("/") + "/" if args.resume_from else s3_results
     cmd_parts.append(
         f"mkdir -p {results_dir}"
-        f" && aws s3 cp {s3_results} {results_dir} --recursive --region us-east-1 2>/dev/null"
-        f' && echo "Restored checkpoint from S3 ($(wc -l < {results_dir}results.jsonl 2>/dev/null || echo 0) samples)"'
+        f" && aws s3 cp {resume_source} {results_dir} --recursive --region us-east-1 2>/dev/null"
+        f' && echo "Restored checkpoint from {resume_source} ($(wc -l < {results_dir}results.jsonl 2>/dev/null || echo 0) samples)"'
         f' || echo "No previous checkpoint found, starting fresh"'
     )
 
@@ -564,9 +577,10 @@ def launch_greenland_job(
 def main():
     args = parse_args()
     job_name = create_job_name(args)
+    output_dir_name = create_output_dir_name(args)
 
     # Build eval command
-    eval_cmd = build_awm_eval_cmd(args, job_name)
+    eval_cmd = build_awm_eval_cmd(args, output_dir_name)
 
     # Pack and upload code
     code_snapshot_path = pack_code(args, job_name)

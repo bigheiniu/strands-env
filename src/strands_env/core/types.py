@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from abc import ABC, abstractmethod
@@ -162,6 +163,7 @@ class TerminationReason(str, Enum):
     MAX_TOOL_ITERATIONS_REACHED = "max_tool_iterations_reached"
     MAX_TOOL_CALLS_REACHED = "max_tool_calls_reached"
     TIMEOUT = "timeout"
+    CANCELLED = "cancelled"
     UNCLASSIFIED_ERROR = "unclassified_error"
 
     @classmethod
@@ -175,7 +177,7 @@ class TerminationReason(str, Enum):
         return False
 
     @classmethod
-    def from_error(cls, error: Exception | None) -> TerminationReason:
+    def from_error(cls, error: BaseException | None) -> TerminationReason:
         """Map an agent exception to a `TerminationReason`.
 
         Unwraps `EventLoopException` to inspect the underlying cause.
@@ -194,6 +196,8 @@ class TerminationReason(str, Enum):
                 reason = cls.MAX_TOOL_ITERATIONS_REACHED
             case MaxToolCallsReachedError():
                 reason = cls.MAX_TOOL_CALLS_REACHED
+            case e if isinstance(e, asyncio.CancelledError):
+                reason = cls.CANCELLED
             case e if cls._is_timeout(e):
                 reason = cls.TIMEOUT
             case _:

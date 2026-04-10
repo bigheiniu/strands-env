@@ -29,6 +29,7 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from strands_env.core import Action, AsyncEnvFactory, StepResult
+from strands_env.core.types import Observation, TerminationReason
 
 from .metrics import MetricFn, compute_pass_at_k
 
@@ -195,7 +196,18 @@ class Evaluator:
         async def process(prompt_id: str, sample_id: str, action: Action, pbar: tqdm) -> None:
             nonlocal save_counter
             async with semaphore:
-                sample = await self.evaluate_sample(action)
+                try:
+                    sample = await self.evaluate_sample(action)
+                except (Exception, asyncio.CancelledError) as e:
+                    logger.error("[%s]: sample failed with unhandled error: %s", sample_id, e)
+                    sample = EvalSample(
+                        action=action,
+                        step_result=StepResult(
+                            observation=Observation(messages=[], metrics={}),
+                            termination_reason=TerminationReason.UNCLASSIFIED_ERROR,
+                        ),
+                        aborted=True,
+                    )
                 self.results[prompt_id].append(sample)
                 self.completed_ids.add(sample_id)
                 pbar.update(1)

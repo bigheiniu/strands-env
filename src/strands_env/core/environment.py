@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
@@ -116,7 +117,7 @@ class Environment:
         try:
             message = action.message if isinstance(action.message, str) else action.message["content"]
             await agent.invoke_async(message)
-        except Exception as e:
+        except (Exception, asyncio.CancelledError) as e:
             error = e
         termination_reason = TerminationReason.from_error(error)
 
@@ -132,9 +133,12 @@ class Environment:
         }
         observation = Observation(messages=step_messages, tokens=token_obs, metrics=metrics)
         step_result = StepResult(observation=observation, termination_reason=termination_reason)
-        step_result.reward = (
-            (await self.reward_fn.compute(action=action, step_result=step_result)) if self.reward_fn else None
-        )
+        if self.reward_fn:
+            try:
+                step_result.reward = await self.reward_fn.compute(action=action, step_result=step_result)
+            except (Exception, asyncio.CancelledError) as e:
+                logger.warning("Reward computation failed: %s", e)
+                step_result.reward = None
         return step_result
 
     async def cleanup(self) -> None:
