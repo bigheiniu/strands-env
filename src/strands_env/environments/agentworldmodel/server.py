@@ -33,6 +33,10 @@ from awm.tools import get_random_available_port, normalize_scenario_name
 logger = logging.getLogger(__name__)
 
 _MCP_INJECT = """\
+    from fastapi.routing import APIRoute
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            route.operation_id = route.endpoint.__name__
     from fastapi_mcp import FastApiMCP
     mcp = FastApiMCP(app)
     mcp.mount_http()"""
