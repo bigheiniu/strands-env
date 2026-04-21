@@ -110,6 +110,8 @@ def parse_args() -> argparse.Namespace:
                         help="Model backend (default: sglang)")
     parser.add_argument("--model-id", default=None,
                         help="Model ID (e.g., us.anthropic.claude-sonnet-4-5-20250929-v1:0 for bedrock, auto-detected for sglang)")
+    parser.add_argument("--model-id-user", default=None,
+                        help="Model ID for user simulator agent (defaults to --model-id if not set)")
     parser.add_argument("--base-url", default="http://localhost:30000",
                         help="Base URL for SGLang server (default: http://localhost:30000)")
     parser.add_argument("--aws-region", default="us-west-2",
@@ -454,6 +456,11 @@ def build_awm_eval_cmd(args: argparse.Namespace, output_dir_name: str) -> str:
 
     if args.model_id and args.backend != "bedrock":
         eval_parts.append(f"--model-id {args.model_id}")
+
+    # User simulator model (defaults to same as --model-id)
+    model_id_user = args.model_id_user or args.model_id
+    if model_id_user:
+        eval_parts.append(f"--model-id-user {model_id_user}")
 
     # Sampling params
     if args.temperature is not None:

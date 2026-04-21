@@ -114,6 +114,8 @@ def parse_args() -> argparse.Namespace:
                         help="Base URL for SGLang server (default: http://localhost:30000)")
     parser.add_argument("--aws-region", default="us-west-2",
                         help="AWS region for Bedrock (default: us-west-2)")
+    parser.add_argument("--profile-name", default=None,
+                        help="AWS profile name for Bedrock (default: None, uses default credentials)")
     parser.add_argument("--tool-parser", default=None,
                         help="Tool parser name (e.g., 'hermes', 'qwen_xml')")
 
@@ -447,6 +449,8 @@ def build_awm_eval_cmd(args: argparse.Namespace, output_dir_name: str) -> str:
         if args.model_id:
             eval_parts.append(f"--model-id {args.model_id}")
         eval_parts.append(f"--region {args.aws_region}")
+        if args.profile_name:
+            eval_parts.append(f"--profile-name {args.profile_name}")
 
     if args.model_id and args.backend != "bedrock":
         eval_parts.append(f"--model-id {args.model_id}")

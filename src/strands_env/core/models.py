@@ -300,6 +300,7 @@ class ModelConfig:
 
     # Bedrock / model identifier
     model_id: str | None = None
+    model_id_user: str | None = None
     region: str = "us-west-2"
     profile_name: str | None = None
     role_arn: str | None = None
@@ -355,3 +356,25 @@ def build_model_factory(config: ModelConfig | dict[str, Any]) -> ModelFactory:
             )
         case _:
             raise ValueError(f"Unsupported backend for ModelConfig: {config.backend!r}")
+
+
+def build_user_model_factory(config: ModelConfig | dict[str, Any]) -> ModelFactory:
+    """Build a `ModelFactory` for the user simulator from a `ModelConfig`.
+
+    Uses ``model_id_user`` if set, otherwise falls back to ``model_id``.
+    """
+    if isinstance(config, dict):
+        config = ModelConfig(**config)
+    user_config = ModelConfig(
+        backend=config.backend,
+        base_url=config.base_url,
+        model_id=config.model_id_user or config.model_id,
+        tokenizer_path=config.tokenizer_path,
+        tool_parser=config.tool_parser,
+        max_connections=config.max_connections,
+        region=config.region,
+        profile_name=config.profile_name,
+        role_arn=config.role_arn,
+        sampling_params=config.sampling_params,
+    )
+    return build_model_factory(user_config)

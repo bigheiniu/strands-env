@@ -116,6 +116,7 @@ def list_cmd() -> None:
 )
 @click.option("--base-url", type=str, default="http://localhost:30000", help="Base URL for SGLang server.")
 @click.option("--model-id", type=str, default=None, help="Model ID. Auto-detected for SGLang if not provided.")
+@click.option("--model-id-user", type=str, default=None, help="Model ID for user simulator (defaults to --model-id).")
 @click.option("--tokenizer-path", type=str, default=None, help="Tokenizer path for SGLang.")
 @click.option("--region", type=str, default=None, help="AWS region for Bedrock.")
 @click.option("--profile-name", type=str, default=None, help="AWS profile name for Bedrock.")
@@ -146,6 +147,7 @@ def run_cmd(
     backend: Literal["sglang", "bedrock", "kimi"],
     base_url: str,
     model_id: str | None,
+    model_id_user: str | None,
     tokenizer_path: str | None,
     region: str | None,
     profile_name: str | None,
@@ -209,6 +211,7 @@ def run_cmd(
         backend=backend,
         base_url=base_url,
         model_id=model_id,
+        model_id_user=model_id_user,
         tokenizer_path=tokenizer_path,
         tool_parser=tool_parser,
         max_connections=max_concurrency,

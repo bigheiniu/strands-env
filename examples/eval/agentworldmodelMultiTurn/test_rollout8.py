@@ -19,7 +19,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+MODEL_ID_USER = os.environ.get("MODEL_ID_USER", MODEL_ID)
 REGION = "us-west-2"
 MAX_TURNS = 5
 MAX_TOOL_ITERS = 15
@@ -50,7 +51,7 @@ async def main():
         sampling_params=sampling_params,
     )
     user_factory = bedrock_model_factory(
-        model_id=MODEL_ID,
+        model_id=MODEL_ID_USER,
         boto_session=boto_session,
         sampling_params=sampling_params,
     )

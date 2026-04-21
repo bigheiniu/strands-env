@@ -71,8 +71,18 @@ def _create_database(db_path: Path, db_schema: dict[str, Any], sample_data: dict
         conn.close()
 
 
-def create_env_factory(model_factory: ModelFactory, model_factory_user: ModelFactory, **env_config):
+def create_env_factory(
+    model_factory_or_config=None,
+    model_factory_user: ModelFactory | None = None,
+    model_config: dict | None = None,
+    **env_config,
+):
     """Create env_factory for `DualAgentWorldModelEnvironment`.
+
+    Can be called in two ways:
+      1. Direct: ``create_env_factory(model_factory=..., model_factory_user=...)``
+      2. Config-driven (CLI path): ``create_env_factory(model_config_dict, **env_config)``
+         Uses ``model_id_user`` in the config to build the user model factory.
 
     Requires ``AWM_DATA_PATH`` environment variable pointing to a self-contained JSONL
     dataset file where each line contains inline database schema, sample data, server
@@ -81,6 +91,22 @@ def create_env_factory(model_factory: ModelFactory, model_factory_user: ModelFac
     Extra ``env_config`` keys (e.g., ``max_turns``, ``user_system_prompt``) are
     forwarded to `DualAgentWorldModelEnvironment`.
     """
+    from strands_env.core.models import build_model_factory, build_user_model_factory
+
+    # Support CLI calling convention: create_env_factory(model_config_dict, **env_config)
+    if isinstance(model_factory_or_config, dict):
+        model_config = model_factory_or_config
+        model_factory = None
+    else:
+        model_factory = model_factory_or_config
+
+    if model_factory is None and model_config is not None:
+        model_factory = build_model_factory(model_config)
+        model_factory_user = build_user_model_factory(model_config)
+    if model_factory is None:
+        raise ValueError("Either model_factory or model_config must be provided")
+    if model_factory_user is None:
+        model_factory_user = model_factory
     reward_fn = AgentWorldModelRewardFunction()
 
     async def env_factory(action: Action):
